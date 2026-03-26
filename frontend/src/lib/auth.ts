@@ -14,6 +14,8 @@ declare module "next-auth" {
       role: string
       aiMode: string
       discovery: boolean
+      subscriptionTier: string
+      stripeCustomerId: string | null
     }
   }
 
@@ -21,6 +23,8 @@ declare module "next-auth" {
     role: string
     aiMode: string
     discovery: boolean
+    subscriptionTier: string
+    stripeCustomerId: string | null
   }
 }
 
@@ -30,6 +34,8 @@ declare module "next-auth/jwt" {
     role: string
     aiMode: string
     discovery: boolean
+    subscriptionTier: string
+    stripeCustomerId: string | null
   }
 }
 
@@ -76,6 +82,8 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           aiMode: user.aiMode,
           discovery: user.discovery,
+          subscriptionTier: user.subscriptionTier,
+          stripeCustomerId: user.stripeCustomerId,
         }
       }
     })
@@ -101,6 +109,8 @@ export const authOptions: NextAuthOptions = {
           role: (user as any).role,
           aiMode: (user as any).aiMode,
           discovery: (user as any).discovery,
+          subscriptionTier: (user as any).subscriptionTier,
+          stripeCustomerId: (user as any).stripeCustomerId,
         }
       }
       return token

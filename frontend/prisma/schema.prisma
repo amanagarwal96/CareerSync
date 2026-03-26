@@ -49,6 +49,8 @@ model User {
   coverLetters  CoverLetter[]
   candidates    Candidate[]
   
+  subscriptionTier String @default("FREE")
+  stripeCustomerId String? @unique
   role             String  @default("STUDENT")
   aiMode           String  @default("pro")
   discovery        Boolean @default(true)
