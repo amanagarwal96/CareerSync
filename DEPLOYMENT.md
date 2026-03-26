@@ -3,17 +3,20 @@
 This guide outlines the professional path to deploying CareerSync Pro as a high-performance, scalable web application.
 
 ## 🏗️ Architecture Stack
-*   **Frontend:** Next.js (Hosted on [Vercel](https://vercel.com))
-*   **Backend:** FastAPI (Hosted on [Railway](https://railway.app) or Render)
-*   **Database:** PostgreSQL (Hosted on [Supabase](https://supabase.com) or Neon)
+*   **Frontend:** Next.js (Hosted on [Vercel](https://vercel.com) or Docker)
+*   **Backend:** FastAPI (Hosted on [Railway](https://railway.app) or Docker)
+*   **Database:** PostgreSQL (Hosted on [Supabase](https://supabase.com) - **Pooling Port: 6543 required**)
 *   **Payments:** [Stripe](https://stripe.com)
-*   **Email:** Professional SMTP (University Mail / Resend / SendGrid)
+*   **Email:** Professional SMTP (Gmail App Password with institution mail)
 
 ---
 
 ## 🛠️ Step 1: Database Setup (Supabase)
 1.  Create a project on [Supabase](https://supabase.com).
-2.  Copy your **Connection String** (Transaction mode).
+2.  **CRITICAL**: Copy your **Connection String** from the `Database settings` -> `Connection Pooler`. 
+    - Use the **Pooling Port: 6543**.
+    - Append `&pgbouncer=true&connection_limit=1` to the URL.
+    - Path: `postgresql://postgres.[REF]:[PASS]@[HOST]:6543/postgres?pgbouncer=true&connection_limit=1`
 3.  In your `frontend/prisma/schema.prisma`, change the provider:
     ```prisma
     datasource db {
@@ -23,14 +26,18 @@ This guide outlines the professional path to deploying CareerSync Pro as a high-
     ```
 4.  Run `npx prisma db push` to initialize your production schema.
 
-## 🛠️ Step 2: Backend Deployment (Railway)
-1.  Connect your GitHub repository to [Railway](https://railway.app).
-2.  Deploy the `/backend` folder.
-3.  Add the following Environment Variables in Railway:
-    *   `OPENAI_API_KEY`: Your production OpenAI key.
-    *   `NEXT_PUBLIC_BACKEND_URL`: The URL provided by Railway.
+## 🐋 Deployment via Docker (Recommended)
+1.  Ensure Docker and Docker Compose are installed on your host.
+2.  Prepare your `.env` with the pooling `DATABASE_URL` (Port 6543).
+3.  Deploy the entire stack with a single command:
+    ```bash
+    docker-compose up -d --build
+    ```
+4.  **Verification**: Confirm services are live:
+    - Frontend: `http://localhost:3000`
+    - Backend: `http://localhost:8000`
 
-## 🛠️ Step 3: Frontend Deployment (Vercel)
+## 🛠️ Step 3: Global Deployment (Vercel/Railway)
 1.  Connect your GitHub repository to [Vercel](https://vercel.com).
 2.  Deploy the `/frontend` folder.
 3.  Add all variables from your `.env` to Vercel Settings:

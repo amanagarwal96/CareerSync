@@ -1,73 +1,68 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import nodemailer from "nodemailer";
+import { db } from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
 
-    if (!email) {
-      return NextResponse.json({ message: "Email is required" }, { status: 400 });
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return NextResponse.json(
+        { message: "MOCK_OTP", otp: "123456" },
+        { status: 200 }
+      );
     }
 
-    try {
-      console.log(`[SEND_OTP] Starting DB check for ${email}...`);
-      const existingUser = await db.user.findUnique({
-        where: { email },
-      });
-      console.log(`[SEND_OTP] DB check complete. User exists: ${!!existingUser}`);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-      if (existingUser) {
-        return NextResponse.json({ message: "User already exists with this email" }, { status: 409 });
-      }
-
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expires = new Date(Date.now() + 10 * 60 * 1000);
-
-      console.log(`[SEND_OTP] Clearing old tokens...`);
-      await db.verificationToken.deleteMany({
-        where: { identifier: email },
-      });
-
-      console.log(`[SEND_OTP] Saving new OTP to DB...`);
-      await db.verificationToken.create({
-        data: {
+    // Upsert the verification token in the database
+    await db.verificationToken.upsert({
+      where: {
+        identifier_token: {
           identifier: email,
           token: otp,
-          expires,
         },
-      });
+      },
+      update: {
+        expires,
+      },
+      create: {
+        identifier: email,
+        token: otp,
+        expires,
+      },
+    });
 
-      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.log(`[SEND_OTP] WARNING: Email credentials missing. MOCK mode.`);
-        return NextResponse.json({ message: "MOCK_OTP", otp }, { status: 200 });
-      }
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-      console.log(`[SEND_OTP] Initializing Nodemailer...`);
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
+    const mailOptions = {
+      from: `"CareerSync Pro" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your CareerSync Verification Code",
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; background: #0a0a0a; color: #fff; border-radius: 12px; border: 1px solid #333;">
+          <h2 style="color: #3b82f6;">Verify your email</h2>
+          <p>Welcome to CareerSync Pro. Use the following code to complete your registration:</p>
+          <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #10b981; margin: 20px 0;">
+            ${otp}
+          </div>
+          <p style="color: #666; font-size: 12px;">This code will expire in 10 minutes.</p>
+        </div>
+      `,
+    };
 
-      console.log(`[SEND_OTP] Attempting to send mail via SMTP...`);
-      await transporter.sendMail({
-        from: `"CareerSync Pro" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: "Your CareerSync Registration OTP",
-        html: `<h1>Welcome to CareerSync!</h1><p>Your OTP is: <strong>${otp}</strong></p>`,
-      });
+    await transporter.sendMail(mailOptions);
 
-      console.log(`[SEND_OTP] OTP successfully delivered to ${email}`);
-      return NextResponse.json({ message: "OTP sent successfully" }, { status: 200 });
-    } catch (db_error: any) {
-      console.error("[SEND_OTP] CORE ERROR:", db_error);
-      return NextResponse.json({ 
-        message: "Production Error", 
-        debug: db_error.message || "Unknown",
-        stack: process.env.NODE_ENV === "development" ? db_error.stack : undefined
-      }, { status: 500 });
-    }
+    return NextResponse.json({ message: "OTP sent successfully", otp }, { status: 200 });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ message: "Error", error: errorMessage }, { status: 500 });
+  }
 }

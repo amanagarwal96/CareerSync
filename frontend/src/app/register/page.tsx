@@ -1,15 +1,24 @@
 "use client"
+// HMR Force Update: JSX structure verified
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { Zap, Loader2, ShieldCheck } from "lucide-react"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard")
+    }
+  }, [status, router])
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -29,14 +38,13 @@ export default function RegisterPage() {
         body: JSON.stringify({ email }),
       })
       const data = await res.json()
-      if (data.message === "MOCK_OTP") {
-        alert("Development Mode: Your email variables (EMAIL_USER) are not set. The auto-generated OTP is: " + data.otp)
-      } else if (!res.ok) {
+      if (!res.ok) {
         throw new Error(data.message || "Failed to send OTP")
       }
       setStep(2)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to send OTP";
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -60,21 +68,22 @@ export default function RegisterPage() {
       })
 
       if (!res.ok) {
-        const text = await res.json()
-        throw new Error(text.message || "Something went wrong")
+        const data = await res.json()
+        throw new Error(data.message || "Something went wrong")
       }
 
       // Automatically redirect to login
       router.push("/login")
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong";
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative px-4 font-outfit">
+    <div className="min-h-screen flex items-center justify-center relative px-4 font-outfit text-white">
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-secondary/20 blur-[120px] pointer-events-none" />
       <div className="glass-card w-full max-w-md p-8 relative z-10 border-white/10">
         
@@ -82,7 +91,7 @@ export default function RegisterPage() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mb-4 border border-white/20 shadow-xl">
             {step === 1 ? <Zap className="w-6 h-6 text-white" /> : <ShieldCheck className="w-6 h-6 text-white" />}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-outfit font-bold text-white mb-2">
             {step === 1 ? "Create Account" : "Verify Email"}
           </h1>
           <p className="text-muted-foreground text-sm text-center">
@@ -98,7 +107,6 @@ export default function RegisterPage() {
 
         {step === 1 && (
           <form key="step1" onSubmit={handleSendOtp} className="space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
-            
             {/* Role Selection Matrix */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <button
@@ -169,8 +177,7 @@ export default function RegisterPage() {
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send OTP"}
             </button>
           </form>
-        )
-}
+        )}
 
         {step === 2 && (
           <form key="step2" onSubmit={handleVerifyOtpAndSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">

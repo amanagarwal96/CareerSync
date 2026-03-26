@@ -2,17 +2,25 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { useSession, signIn } from "next-auth/react"
 import Link from "next/link"
 import { Lock, Loader2, Mail } from "lucide-react"
+import { useEffect } from "react"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard")
+    }
+  }, [status, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -18,8 +18,42 @@ export default async function DashboardPage() {
   const atsScore = latestResume?.atsScore || "?";
   const hasResume = !!latestResume;
 
+  if (user?.role === "RECRUITER") {
+    return (
+      <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-y-auto px-4 md:px-12 pt-12 pb-24 max-w-7xl mx-auto w-full">
+        <div className="z-10 relative mb-12">
+          <h1 className="text-4xl lg:text-5xl font-outfit font-bold text-white mb-2">
+            Recruiter Dashboard
+          </h1>
+          <p className="text-muted-foreground text-lg">Welcome back, {userName}. Manage your candidate verifications.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+          <Link href="/dashboard/recruiter" className="group p-8 glass-card border-white/10 hover:border-blue-500/50 transition-all hover:bg-white/5 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-8 h-8 text-blue-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Recruiter Verification Engine</h3>
+            <p className="text-sm text-muted-foreground max-w-xs">Verify candidate GitHub skills and JD matching in one click.</p>
+            <div className="mt-6 flex items-center gap-2 text-primary font-bold text-sm">
+              Launch Engine <ChevronRight className="w-4 h-4" />
+            </div>
+          </Link>
+
+          <div className="p-8 glass-card border-white/10 flex flex-col items-center text-center justify-center bg-white/5">
+            <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mb-6">
+              <Star className="w-8 h-8 text-yellow-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Talent Pipeline</h3>
+            <p className="text-sm text-muted-foreground max-w-xs">Your saved candidate verifications will appear here in the next update.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-y-auto px-12 pt-12 pb-24 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-y-auto px-4 md:px-12 pt-12 pb-24 max-w-7xl mx-auto w-full">
       
       <div className="z-10 relative mb-12">
         <h1 className="text-4xl lg:text-5xl font-outfit font-bold text-white mb-2">
@@ -47,13 +81,15 @@ export default async function DashboardPage() {
           <p className="text-xs text-muted-foreground mt-2">Tailor to a specific job description.</p>
         </Link>
 
-        <Link href="/dashboard/recruiter" className="group p-6 glass-card border-white/10 hover:border-blue-500/50 transition-all hover:bg-white/5">
-          <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <ShieldCheck className="w-6 h-6 text-blue-400" />
-          </div>
-          <h3 className="font-bold text-white mb-1">GitHub Verify</h3>
-          <p className="text-xs text-muted-foreground mt-2">Prove your hard skills with repository evidence.</p>
-        </Link>
+        {user?.role === "RECRUITER" && (
+          <Link href="/dashboard/recruiter" className="group p-6 glass-card border-white/10 hover:border-blue-500/50 transition-all hover:bg-white/5">
+            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-6 h-6 text-blue-400" />
+            </div>
+            <h3 className="font-bold text-white mb-1">GitHub Verify</h3>
+            <p className="text-xs text-muted-foreground mt-2">Prove your hard skills with repository evidence.</p>
+          </Link>
+        )}
       </div>
 
       <div className="glass-card border-primary/30 rounded-xl p-5 mb-10 shadow-sm flex items-start gap-4 bg-primary/10">
@@ -103,20 +139,21 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Recruiter Skill Evidence */}
-        <div className="glass-card border-l-[6px] border-l-rose-500 rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between group hover:border-white/20 transition-all gap-6">
-          <div>
-            <h3 className="text-sm font-bold uppercase text-rose-400 tracking-wider mb-2">Recruiter Confidence Link</h3>
-            <p className="text-muted-foreground font-medium mb-4 max-w-[500px]">You have not mapped your GitHub repositories. Recruiters cannot verify your hard skills yet.</p>
-            <Link href="/dashboard/recruiter" className="inline-flex items-center gap-2 bg-rose-500/20 text-rose-300 border border-rose-500/30 py-2 px-4 rounded-lg text-sm font-bold hover:bg-rose-500/30 transition-colors">
-              <ShieldCheck className="w-4 h-4" /> Link GitHub
-            </Link>
+        {user?.role === "RECRUITER" && (
+          <div className="glass-card border-l-[6px] border-l-rose-500 rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between group hover:border-white/20 transition-all gap-6">
+            <div>
+              <h3 className="text-sm font-bold uppercase text-rose-400 tracking-wider mb-2">Recruiter Confidence Link</h3>
+              <p className="text-muted-foreground font-medium mb-4 max-w-[500px]">You have not mapped your GitHub repositories. Recruiters cannot verify your hard skills yet.</p>
+              <Link href="/dashboard/recruiter" className="inline-flex items-center gap-2 bg-rose-500/20 text-rose-300 border border-rose-500/30 py-2 px-4 rounded-lg text-sm font-bold hover:bg-rose-500/30 transition-colors">
+                <ShieldCheck className="w-4 h-4" /> Link GitHub
+              </Link>
+            </div>
+            <div className="text-right flex items-baseline gap-1">
+              <span className="text-5xl font-black font-outfit text-white/50">?</span>
+              <span className="text-muted-foreground font-bold">/100</span>
+            </div>
           </div>
-          <div className="text-right flex items-baseline gap-1">
-            <span className="text-5xl font-black font-outfit text-white/50">?</span>
-            <span className="text-muted-foreground font-bold">/100</span>
-          </div>
-        </div>
+        )}
       </div>
 
     </div>
