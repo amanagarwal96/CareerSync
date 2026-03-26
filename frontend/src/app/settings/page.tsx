@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
-  Monitor,
   Zap,
   Globe,
   Database,
@@ -183,33 +182,8 @@ export default function SettingsPage() {
           <main className="lg:col-span-9 space-y-10 animate-in fade-in slide-in-from-right-4 duration-700">
             {activeTab === "account" && (
               <div className="space-y-8">
-                {/* Visual Architecture */}
-                <section className="glass-card p-10 border-border group overflow-hidden relative">
-                   <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Monitor className="w-32 h-32" />
-                  </div>
-                  <h2 className="text-2xl font-black mb-1 group-hover:text-primary transition-colors font-outfit">Visual Architecture</h2>
-                  <p className="text-muted-foreground text-sm mb-8">Override system interface directives.</p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                      <label className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-4 block">Engine Theme</label>
-                      <ThemeToggle />
-                    </div>
-                    <div className="p-4 rounded-2xl bg-muted/30 border border-border flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
-                        <Zap className="w-5 h-5 text-orange-500" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold">Dynamic Transitions</div>
-                        <p className="text-[10px] text-muted-foreground">Enabled Global Motion v2.4</p>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
                 {/* Profile Detail Hub */}
-                <section className="glass-card p-10 border-border">
+                <section className="glass-card p-10 border-border bg-muted/20">
                   <h2 className="text-2xl font-black mb-8 font-outfit">Identity Hub</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                     <div className="space-y-2">
