@@ -25,6 +25,17 @@
   --color-ring: #3B82F6;
 }
 
+.light {
+  --color-background: #FFFFFF;
+  --color-foreground: #09090B;
+  --color-muted: #F4F4F5;
+  --color-muted-foreground: #71717A;
+  --color-accent: #F4F4F5;
+  --color-accent-foreground: #09090B;
+  --color-border: #E4E4E7;
+  --color-input: #E4E4E7;
+}
+
 :root {
   color-scheme: dark;
 }
