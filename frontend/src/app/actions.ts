@@ -92,12 +92,25 @@ export async function deleteAccount() {
   }
 }
 
-export async function updatePreferences(data: { resumePublic?: boolean, notifications?: boolean }) {
+export async function updatePreferences(data: { aiMode?: string, discovery?: boolean }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return { success: false, error: "Not logged in" }
   
-  // Note: These would usually go to a UserSettings model or a JSON field
-  // For now we revalidate to simulate functioning
-  revalidatePath('/settings')
-  return { success: true }
+  const userId = (session.user as any).id;
+  if (!userId) return { success: false, error: "No user ID" }
+
+  try {
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.aiMode && { aiMode: data.aiMode }),
+        ...(data.discovery !== undefined && { discovery: data.discovery }),
+      }
+    })
+    revalidatePath('/settings')
+    return { success: true }
+  } catch (e: any) {
+    console.error("Update Preferences Error:", e)
+    return { success: false, error: e.message }
+  }
 }

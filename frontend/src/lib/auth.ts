@@ -12,11 +12,15 @@ declare module "next-auth" {
       email?: string | null
       image?: string | null
       role: string
+      aiMode: string
+      discovery: boolean
     }
   }
 
   interface User {
     role: string
+    aiMode: string
+    discovery: boolean
   }
 }
 
@@ -24,6 +28,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string
     role: string
+    aiMode: string
+    discovery: boolean
   }
 }
 
@@ -68,6 +74,8 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          aiMode: user.aiMode,
+          discovery: user.discovery,
         }
       }
     })
@@ -80,6 +88,8 @@ export const authOptions: NextAuthOptions = {
           ...session.user,
           id: token.id,
           role: token.role,
+          aiMode: token.aiMode,
+          discovery: token.discovery,
         }
       }
     },
@@ -89,6 +99,8 @@ export const authOptions: NextAuthOptions = {
           ...token,
           id: user.id,
           role: (user as any).role,
+          aiMode: (user as any).aiMode,
+          discovery: (user as any).discovery,
         }
       }
       return token
