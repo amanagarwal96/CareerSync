@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-inter: var(--font-inter);
+  --font-outfit: var(--font-outfit);
+  --font-sans: var(--font-inter);
+  
+  --color-background: #0A0A0B;
+  --color-foreground: #FAFAFA;
+  
+  --color-primary: #3B82F6;
+  --color-primary-foreground: #FFFFFF;
+  
+  --color-secondary: #10B981;
+  --color-secondary-foreground: #FFFFFF;
+  
+  --color-muted: #18181A;
+  --color-muted-foreground: #A1A1AA;
+  
+  --color-accent: #27272A;
+  --color-accent-foreground: #FAFAFA;
+  
+  --color-border: #27272A;
+  --color-input: #27272A;
+  --color-ring: #3B82F6;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, rgba(10, 10, 11, 0) 50%);
+  background-attachment: fixed;
+}
+
+/* Neo-Glassmorphism utilities */
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)];
+  }
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 hover:border-primary/50 transition-colors duration-300;
+  }
+}
