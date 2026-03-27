@@ -36,7 +36,12 @@ def extract_contact_info(text: str):
         "college": college
     }
 
-load_dotenv()
+# Load environment variables explicitly from .env if available
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path, override=True)
+else:
+    load_dotenv()
 
 app = FastAPI(title="CareerSync Pro API", version="1.0.0")
 
@@ -50,26 +55,258 @@ app.add_middleware(
 
 # Initialize OpenAI client if key is available
 openai_client = None
-if os.getenv("OPENAI_API_KEY"):
-    openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+if os.getenv("OPENAI_API_KEY") and not os.getenv("OPENAI_API_KEY").startswith("your_"):
+    try:
+        openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    except Exception as e:
+        print(f"ERROR: Failed to initialize OpenAI client: {e}")
+else:
+    print("WARNING: OPENAI_API_KEY missing or invalid in environment. System will use mock fallback.")
 
 # Add fallback mocks
 def get_mock_resume_analysis():
+    import random
     return {
-        "ats_score": 78,
-        "keyword_gaps": ["React Server Components", "Redis", "System Design"],
+        "ats_score": random.randint(65, 85),
+        "keyword_gaps": ["React Server Components", "Redis", "System Design", "Cloud Infrastructure"],
         "enhancement_suggestions": [
             {
-                "original": "Worked on backend caching",
-                "improved": "Architected distributed caching tier using Redis, reducing API latency by 45%",
-                "reason": "Missing impact metrics and specific technologies."
+                "original": "Worked on backend tasks",
+                "improved": "Architected distributed systems using Redis, reducing latency by 45%",
+                "reason": "Adding metrics and specific technologies."
             }
         ],
+        "message": "AI Backend Offline (Quota Exceeded or Key Invalid). Using fallback analysis.",
         "extracted_text": "Sample uploaded resume text... Worked on backend caching... I did a lot of things... Python and React..."
     }
 
-def get_mock_cover_letter():
-    return "Dear Hiring Manager,\n\nI am writing to express my strong interest in the open position..."
+def get_resume_highlights(text):
+    import re
+    text_l = text.lower()
+    # Extract years
+    years = "several"
+    years_match = re.search(r'(\d+)\+?\s*year', text_l)
+    if years_match:
+        years = years_match.group(1)
+    
+    # Extract common tech
+    tech_stack = []
+    common_tech = ["python", "react", "next.js", "node", "typescript", "java", "aws", "docker", "kubernetes", "sql", "nosql", "fastapi", "django"]
+    for t in common_tech:
+        if t in text_l:
+            tech_stack.append(t.title() if len(t) > 3 else t.upper())
+    
+    tech_str = ", ".join(tech_stack[:4]) if tech_stack else "modern tech stacks"
+    return years, tech_str
+
+def get_company_sector_mission(company):
+    c = company.lower()
+    if any(k in c for k in ["flipkart", "amazon", "ebay", "shop", "cart", "commerce", "market"]):
+        return f"As a leader in the global e-commerce landscape, {company}'s focus on seamless logistics and hyper-scale marketplace dynamics is unparalleled. I am eager to contribute my technical vigor to your mission of redefining the digital consumer experience."
+    if any(k in c for k in ["ai", "tech", "soft", "data", "intel", "neural", "logic"]):
+        return f"Your commitment to pushing the boundaries of artificial intelligence and frontier software aligns perfectly with my own drive to architect the next generation of intelligent, self-evolving systems."
+    if any(k in c for k in ["pay", "bank", "fin", "invest", "crypto", "wealth", "ledger"]):
+        return f"I admire {company}'s approach to democratizing financial services and securing the future of global transactions. My experience in high-security, high-availability fintech systems makes me a natural strategic fit."
+    if any(k in c for k in ["health", "med", "bio", "care", "cure", "life"]):
+        return f"The way you are leveraging deep-tech to improve patient outcomes is truly inspiring. I want to apply my engineering expertise to solve the most critical challenges in the healthcare and life-sciences sector."
+    
+    return f"I have followed {company}'s exponential growth trajectory and am deeply impressed by your commitment to redefining industry standards and delivering elite-tier products to a global, high-demand audience."
+
+def get_mock_cover_letter(role="Candidate", target="the role", resume_text=""):
+    # Smarter Target/Company extraction
+    target_clean = target
+    company = "your company"
+    
+    if " at " in target:
+        parts = target.split(" at ")
+        target_clean = parts[0]
+        company = parts[1]
+    elif " @ " in target:
+        parts = target.split(" @ ")
+        target_clean = parts[0]
+        company = parts[1]
+    else:
+        known_roles = ["engineer", "developer", "manager", "designer", "scientist", "tester", "qa"]
+        if any(r in target.lower() for r in known_roles):
+            target_clean = target
+            company = "your company"
+        else:
+            company = target
+            target_clean = "the open position"
+
+    # Deep personalization from resume text
+    years, tech = get_resume_highlights(resume_text)
+    
+    # High-Power Achievement Blocks
+    role_lower = role.lower()
+    mission_stmt = get_company_sector_mission(company)
+    
+    # Role-specific narratives
+    if "qa" in role_lower or "tester" in role_lower or "sdet" in role_lower:
+        role_narrative = {
+            "intro": f"I am writing to express my strategic interest in the {target_clean} opening. As an elite QA Architect with over {years} years of expertise in {tech}, I specialize in making quality a non-negotiable standard.",
+            "achievement": f"I have pioneered 'Shift-Left' zero-defect frameworks and advanced automation using {tech.split(',')[0] if ',' in tech else tech}, reducing regressions by 40% while maintaining 99.99% system uptime.",
+            "value_prop": f"I am ready to transform {company}'s QA department into a source of engineering pride and a massive competitive advantage.",
+            "signoff": "Quality and Excellence,"
+        }
+    elif "backend" in role_lower:
+        role_narrative = {
+            "intro": f"I am submitting my high-impact application for the {target_clean} role. With {years} years focused on {tech}, my career is defined by building the invisible, high-performance engines that power the world's most resilient platforms.",
+            "achievement": f"I have orchestrated distributed architectures using {tech.split(',')[0] if ',' in tech else tech} handling billions of monthly requests, focusing on sub-millisecond latency and bulletproof data integrity.",
+            "value_prop": f"I will bring a 'global-scale' mindset to {company}, ensuring your infrastructure is prepared for your next order of magnitude in growth.",
+            "signoff": "In pursuit of the perfect architecture,"
+        }
+    elif "frontend" in role_lower or "ui" in role_lower or "ux" in role_lower:
+        role_narrative = {
+            "intro": f"I am thrilled to apply for the {target_clean} opportunity. With {years} years of elite expertise in {tech}, I bridge the gap between complex engineering and beautiful, high-retention user experiences.",
+            "achievement": f"I have directed the creation of award-winning UIs using {tech.split(',')[0] if ',' in tech else tech} that scaled to millions of users, driving 30% increases in engagement.",
+            "value_prop": f"I am eager to elevate {company}'s digital presence into a benchmark-setting experience that defines your industry's future.",
+            "signoff": "Crafting the Future of the Web,"
+        }
+    else:
+        role_narrative = {
+            "intro": f"I am writing to express my interest in the {target_clean} position. With {years} years of experience across {tech}, I am a technical leader driven by measurable business outcomes.",
+            "achievement": f"I have a track record of driving exponential technical growth and delivering robust solutions using {tech.split(',')[0] if ',' in tech else tech} to solve real-world problems at scale.",
+            "value_prop": f"I am prepared to help {company} dominate its sector by applying my comprehensive technical leadership to your most ambitious goals.",
+            "signoff": "Best regards,"
+        }
+
+    templates = [
+        f"""
+Dear Leadership at {company},
+
+{role_narrative['intro']}
+
+{mission_stmt} {role_narrative['achievement']}
+
+{role_narrative['value_prop']} I look forward to the opportunity to discuss how I can contribute to {company}'s roadmap.
+
+{role_narrative['signoff']}
+[Your Name]
+""",
+        f"""
+Subject: High-Impact Application: {target_clean} - [Your Name]
+
+Dear {company} Team,
+
+It is with significant enthusiasm that I apply for the {target_clean} position. Having monitored {company}'s trajectory, I am deeply impressed by your commitment to category-defining innovation.
+
+{role_narrative['achievement']} {mission_stmt}
+
+I specialize in high-stakes environments where performance is the only acceptable standard. {role_narrative['value_prop']}
+
+Sincerely,
+[Your Name]
+""",
+        f"""
+Hello {company} Recruiters,
+
+I'm reaching out regarding the {target_clean} opening. {role_narrative['intro']}
+
+{role_narrative['achievement']}
+
+{mission_stmt} {role_narrative['value_prop']} I'm eager to hear from you.
+
+Thank you,
+[Your Name]
+"""
+    ]
+    
+    import hashlib
+    # More complex hash to ensure even more variety
+    idx = int(hashlib.md5((role + target + str(len(role_narrative['intro']))).encode()).hexdigest(), 16) % len(templates)
+    return templates[idx].strip()
+
+def get_mock_skills(role, target):
+    role_lower = role.lower()
+    target_lower = target.lower()
+    
+    if "qa" in role_lower or "tester" in role_lower or "q&a" in role_lower:
+        return [
+            "Continuous Integration (CI/CD) for QA",
+            "Performance & Load Testing (JMeter/K6)",
+            "Security Testing & OWASP Standards",
+            "Automated API Testing (Postman/RestAssured)",
+            "Test Strategy & Risk Assessment"
+        ]
+    elif "backend" in role_lower:
+        return [
+            "Distributed Systems Architecture",
+            "Advanced Microservices Design Patterns",
+            "Database Scaling & Sharding",
+            "Kubernetes & Container Orchestration",
+            "High-Level System Design & Trade-offs"
+        ]
+    elif "frontend" in role_lower or "ui" in role_lower:
+        return [
+            "Advanced React Patterns & Performance",
+            "Core Web Vitals Optimization",
+            "Design Systems Architecture",
+            "State Management at Scale (Zustand/Redux)",
+            "Web Accessibility (A11y) Expert Level"
+        ]
+    elif "fullstack" in role_lower:
+        return [
+            "End-to-End System Ownership",
+            "Cloud-Native Application Design",
+            "Fullstack Performance Optimization",
+            "DevOps for Fullstack Engineers",
+            "Strategic Product Engineering"
+        ]
+    else:
+        return [
+            "Strategic Leadership & Mentorship",
+            "Cross-functional Project Management",
+            "Business Logic & Financial Modeling",
+            "Advanced System Architecture",
+            "Technical Strategy & OKR Planning"
+        ]
+
+def get_career_strategist_fallback(request):
+    # Heuristic to find current role in text if possible
+    inferred_role = "Software Engineer"
+    text_lower = request.resume_text.lower()
+    
+    # Expanded role dictionary
+    role_map = {
+        "fullstack engineer": "Fullstack Engineer",
+        "fullstackengineer": "Fullstack Engineer",
+        "backend engineer": "Backend Engineer",
+        "backendengineer": "Backend Engineer",
+        "frontend engineer": "Frontend Engineer",
+        "frontendengineer": "Frontend Engineer",
+        "backend developer": "Backend Developer",
+        "frontend developer": "Frontend Developer",
+        "fullstack developer": "Fullstack Developer",
+        "data scientist": "Data Scientist",
+        "product manager": "Product Manager",
+        "devops engineer": "DevOps Engineer",
+        "software engineer": "Software Engineer",
+        "mobile developer": "Mobile Developer",
+        "ios developer": "iOS Developer",
+        "android developer": "Android Developer",
+        "qa engineer": "QA Engineer",
+        "q&a": "QA Engineer",
+        "qa": "QA Engineer",
+        "quality assurance": "QA Engineer",
+        "tester": "QA Engineer",
+        "sdet": "SDET (Software Development Engineer in Test)"
+    }
+    
+    for key, val in role_map.items():
+        if key in text_lower:
+            inferred_role = val
+            break
+            
+    return {
+        "cover_letter": "" if getattr(request, 'only_map', False) else get_mock_cover_letter(inferred_role, request.target_job, request.resume_text),
+        "career_map": {
+            "current": f"{inferred_role} (Inferred)",
+            "next": request.target_job,
+            "future": f"Lead {inferred_role.replace('Associate ', '')}" if "Director" not in request.target_job else f"VP of Engineering / CTO Path",
+            "missing_skills": get_mock_skills(inferred_role, request.target_job)
+        }
+    }
 
 class AnalyzeResumeResponse(BaseModel):
     ats_score: int
@@ -77,8 +314,9 @@ class AnalyzeResumeResponse(BaseModel):
     enhancement_suggestions: list[dict]
 
 class CoverLetterRequest(BaseModel):
-    resume_text: str
     target_job: str
+    resume_text: str
+    only_map: bool = False
 
 class CoverLetterResponse(BaseModel):
     cover_letter: str
@@ -95,7 +333,8 @@ def health_check():
 async def analyze_resume(
     resume_file: UploadFile = File(None),
     resume_text: str = Form(None),
-    target_job: str = Form(...)
+    target_job: str = Form(None),
+    jd_file: UploadFile = File(None)
 ):
     """
     Analyzes a resume against a target job description using OpenAI GPT-4o.
@@ -115,6 +354,39 @@ async def analyze_resume(
     else:
         raise HTTPException(status_code=400, detail="Must provide either a resume file or text inline.")
 
+    # --- DOCUMENT VALIDATION ---
+    text_lower = extracted_text.lower()
+    # Resume-specific sections that are less common in plain JDs or other docs
+    resume_sections = ["work experience", "professional experience", "education history", "academic background", "technical skills", "professional summary", "key achievements", "projects", "certifications", "volunteering"]
+    
+    # Check for presence of these sections
+    section_matches = sum(1 for sec in resume_sections if sec in text_lower)
+    
+    # Also check for personal name/contact cues (basic heuristic)
+    contact_cues = ["phone:", "email:", "linkedin.com/in/", "address:", "github.com/"]
+    cue_matches = sum(1 for cue in contact_cues if cue in text_lower)
+
+    # Reject if it doesn't look like a personal resume
+    if section_matches < 2 and cue_matches < 1:
+        raise HTTPException(
+            status_code=422, 
+            detail="Error: The uploaded document does not appear to be a valid resume. Please ensure your file includes standard sections like Experience, Education, or Skills."
+        )
+
+    # --- JD PDF PROCESSING ---
+    jd_text = target_job if target_job else ""
+    if jd_file:
+        content = await jd_file.read()
+        if jd_file.filename.lower().endswith('.pdf'):
+            reader = PdfReader(io.BytesIO(content))
+            for page in reader.pages:
+                jd_text += page.extract_text() + "\n"
+        else:
+            jd_text += content.decode("utf-8")
+    
+    # Update target_job for prompt
+    final_target_job = jd_text.strip()
+
     if not openai_client:
         # Fallback to mock if no API key
         await asyncio.sleep(1.5)
@@ -122,24 +394,45 @@ async def analyze_resume(
         mock_data["extracted_text"] = extracted_text if extracted_text else mock_data["extracted_text"]
         return mock_data
 
-    system_prompt = """
-    You are an expert ATS (Applicant Tracking System) parser and senior technical recruiter. 
-    Analyze the provided resume against the job description. Output pure JSON exactly matching this structure:
-    {
-      "ats_score": <int 0-100>,
-      "keyword_gaps": ["<missing skill 1>", "<missing skill 2>", "<missing skill 3>", "<missing skill 4>"],
-      "enhancement_suggestions": [
+    if final_target_job:
+        system_prompt = """
+        You are an expert ATS (Applicant Tracking System) parser and senior technical recruiter. 
+        Analyze the provided resume against the job description. Output pure JSON exactly matching this structure:
         {
-          "original": "<exact quote from resume>",
-          "improved": "<highly ATS-optimized rewrite with actionable metric/impact>",
-          "reason": "<why this improves ATS parsing>"
+          "ats_score": <int 0-100>,
+          "keyword_gaps": ["<missing skill 1>", "<missing skill 2>", "<missing skill 3>", "<missing skill 4>"],
+          "enhancement_suggestions": [
+            {
+              "original": "<exact quote from resume>",
+              "improved": "<highly ATS-optimized rewrite with actionable metric/impact>",
+              "reason": "<why this improves ATS parsing>"
+            }
+          ]
         }
-      ]
-    }
-    Make sure to provide EXACTLY 4 distinct highly-impactful enhancement suggestions to give the user plenty to work with.
-    """
-
-    user_prompt = f"Job Description:\n{target_job}\n\nResume Text:\n{extracted_text}"
+        Make sure to provide EXACTLY 4 distinct highly-impactful enhancement suggestions to give the user plenty to work with.
+        """
+        user_prompt = f"Job Description:\n{final_target_job}\n\nResume Text:\n{extracted_text}"
+    else:
+        system_prompt = """
+        You are an expert ATS (Applicant Tracking System) parser and senior technical recruiter. 
+        Analyze the provided resume for high-level ATS best practices, independent of a specific job role.
+        Focus on: readability, quantitative impact (metrics), structural integrity, and standard professional language.
+        Output pure JSON exactly matching this structure:
+        {
+          "ats_score": <int 0-100>,
+          "keyword_gaps": ["<industry standard skill 1>", "<industry standard skill 2>", "<industry standard skill 3>", "<industry standard skill 4>"],
+          "enhancement_suggestions": [
+            {
+              "original": "<exact quote from resume>",
+              "improved": "<highly ATS-optimized rewrite adding specific metrics, tools, or action verbs>",
+              "reason": "<why this improves general ATS score and readability>"
+            }
+          ]
+        }
+        For 'keyword_gaps', suggest general industry-standard technical or soft skills that are missing or weakly represented in the resume to make it more competitive.
+        Provide EXACTLY 4 distinct highly-impactful enhancement suggestions.
+        """
+        user_prompt = f"Evaluate this resume for general ATS effectiveness:\n\nResume Text:\n{extracted_text}"
 
     try:
         response = await openai_client.chat.completions.create(
@@ -169,19 +462,32 @@ async def generate_cover_letter(request: CoverLetterRequest):
     Generates a personalized cover letter using OpenAI.
     """
     if not openai_client:
-        await asyncio.sleep(1.5)
-        return {
-            "cover_letter": get_mock_cover_letter(),
-            "career_map": {
-                "current": "Software Engineer (Inferred)",
-                "next": request.target_job,
-                "future": f"Director of {request.target_job}",
-                "missing_skills": ["Cloud Architecture", "Team Leadership"]
-            }
-        }
+        await asyncio.sleep(0.8)
+        return get_career_strategist_fallback(request)
 
-    system_prompt = "You are an elite executive career strategist. Write a highly tailored, compelling 3-paragraph cover letter based on the user's resume and their 'Target Role & Company'. Research or infer what the given company does, and weave that specific company mission into the letter. Output strictly JSON formatting: {\"cover_letter\": \"<the awesome letter>\", \"career_map\": {\"current\": \"<Extracted Current Role>\", \"next\": \"<Target Role>\", \"future\": \"<Logical Next Step After Target>\", \"missing_skills\": [\"<gap1>\", \"<gap2>\"]}}"
-    user_prompt = f"Job Description:\n{request.target_job}\n\nResume Text:\n{request.resume_text}"
+    if request.only_map:
+        system_prompt = "You are an elite career strategist. Analyze the user's resume and their 'Target Role & Company'. Output strictly JSON formatting for a career path: {\"career_map\": {\"current\": \"<Extracted Current Role>\", \"next\": \"<Target Role>\", \"future\": \"<Logical Next Step After Target>\", \"missing_skills\": [\"<gap1>\", \"<gap2>\"]}}"
+    else:
+        system_prompt = """
+        You are an elite executive career strategist. Write a highly tailored, compelling 3-paragraph cover letter that is COMPLETELY ATS-FRIENDLY.
+        Guidelines:
+        - Use standard headers and professional formatting.
+        - Incorporate relevant keywords from the user's resume and inferred industry standards for the target role.
+        - Research or infer the company's mission and weave it into the letter to demonstrate strong culture fit.
+        - Ensure the tone is professional yet energetic.
+        Output strictly JSON formatting: 
+        {
+          "cover_letter": "<the awesome ATS-optimized letter>", 
+          "career_map": {
+            "current": "<Extracted Current Role>", 
+            "next": "<Target Role>", 
+            "future": "<Logical Next Step After Target>", 
+            "missing_skills": ["<gap1>", "<gap2>"]
+          }
+        }
+        """
+    
+    user_prompt = f"Target Role & Company:\n{request.target_job}\n\nResume/Experience Text:\n{request.resume_text}"
 
     try:
         response = await openai_client.chat.completions.create(
@@ -195,15 +501,7 @@ async def generate_cover_letter(request: CoverLetterRequest):
         return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"Error calling OpenAI: {e}")
-        return {
-            "cover_letter": get_mock_cover_letter(),
-            "career_map": {
-                "current": "Software Engineer (Inferred)",
-                "next": request.target_job,
-                "future": f"Head of {request.target_job}",
-                "missing_skills": ["Leadership", "System Design"]
-            }
-        }
+        return get_career_strategist_fallback(request)
 
 @app.post("/api/recruiter-verify")
 async def recruiter_verify(

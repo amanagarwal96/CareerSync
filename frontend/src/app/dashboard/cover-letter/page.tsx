@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Target, Sparkles, Building2, Map, ChevronRight, Check } from 'lucide-react';
 import { saveCoverLetter } from '@/app/actions';
 
 export default function CareerStrategist() {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
   const [careerMap, setCareerMap] = useState<any>(null);
 
@@ -20,7 +21,7 @@ export default function CareerStrategist() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/cover-letter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_job: targetJob, resume_text: resumeText })
+        body: JSON.stringify({ target_job: targetJob, resume_text: resumeText, only_map: false })
       });
       const data = await res.json();
       const finalLetter = data.cover_letter || "Failed to generate.";
@@ -39,6 +40,39 @@ export default function CareerStrategist() {
       setIsGenerating(false);
     }
   }
+
+  // Reactive Sync for Career Mapping
+  const [lastSyncedTarget, setLastSyncedTarget] = useState("");
+
+  const syncCareerMap = async () => {
+    if (!targetJob || targetJob === lastSyncedTarget) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/cover-letter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_job: targetJob, resume_text: resumeText, only_map: true })
+      });
+      const data = await res.json();
+      if (data.career_map) {
+        setCareerMap(data.career_map);
+        setLastSyncedTarget(targetJob);
+      }
+    } catch (error) {
+      console.error("Sync failed:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        if (targetJob && resumeText) {
+            syncCareerMap();
+        }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [targetJob, resumeText]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 relative z-10 pt-4">
@@ -112,9 +146,12 @@ export default function CareerStrategist() {
         </div>
 
         {/* Career Path Mapping */}
-        <div className="glass-card flex flex-col h-[600px] border-white/10">
-          <div className="p-4 border-b border-white/5 bg-white/5 flex items-center gap-2">
-            <Map className="w-5 h-5 text-purple-400" /> <h3 className="font-bold text-white">Predictive Career Mapping</h3>
+        <div className="glass-card flex flex-col h-[600px] border-white/10 relative overflow-hidden">
+          <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+                <Map className="w-5 h-5 text-purple-400" /> <h3 className="font-bold text-white">Predictive Career Mapping</h3>
+            </div>
+            {isSyncing && <div className="text-[10px] font-bold text-primary animate-pulse uppercase tracking-widest">Syncing AI Path...</div>}
           </div>
           
           <div className="p-6 flex-1 flex flex-col justify-center">

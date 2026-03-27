@@ -7,6 +7,8 @@ import { UploadCloud, FileText, Target, CheckCircle2, ChevronRight, Download, Re
 export default function ResumeHub() {
   const [jobDescription, setJobDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [jdFile, setJdFile] = useState<File | null>(null);
+  const [useJdFile, setUseJdFile] = useState(false);
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<null | any>(null);
@@ -24,11 +26,21 @@ export default function ResumeHub() {
       if (file) {
         formData.append("resume_file", file);
       }
+      if (useJdFile && jdFile) {
+        formData.append("jd_file", jdFile);
+      }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/analyze-resume`, {
         method: "POST",
         body: formData,
       });
+
+      if (res.status === 422) {
+        const errorData = await res.json();
+        alert(errorData.detail);
+        setIsAnalyzing(false);
+        return;
+      }
 
       if (!res.ok) throw new Error("Backend AI Error");
       
@@ -105,24 +117,45 @@ export default function ResumeHub() {
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 animate-in fade-in duration-500">
         <div className="w-full max-w-4xl glass-card rounded-2xl overflow-hidden flex flex-col md:flex-row border border-white/10">
           <div className="w-full md:w-5/12 bg-black/40 p-10 flex flex-col justify-center relative overflow-hidden text-white border-r border-white/5">
-            <h1 className="text-3xl font-outfit font-bold mb-4">Targeted Resume</h1>
-            <p className="text-muted-foreground text-sm leading-relaxed mb-8">Upload your existing resume and paste the job description you are aiming for. Our neural matching engine will extract the core requirements and identify exact keyword gaps.</p>
+            <h1 className="text-3xl font-outfit font-bold mb-4">ATS Resume Hub</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed mb-8">Upload your resume for a deep ATS analysis. You can also paste a job description to get a targeted keyword gap analysis and custom rewrites.</p>
             <div className="space-y-4 text-sm font-medium">
-              <div className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /> Identifies ATS missing skills</div>
-              <div className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /> Provides exact sentence rewrites</div>
-              <div className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /> Visual side-by-side verification</div>
+              <div className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /> Deep ATS Score Analysis</div>
+              <div className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /> Impact-based Sentence Rewrites</div>
+              <div className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-emerald-400" /> Industry Standard Skill Gaps</div>
             </div>
           </div>
           <div className="w-full md:w-7/12 p-10 flex flex-col justify-center">
             
             <div className="mb-6">
-              <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Job Description</label>
-              <textarea 
-                className="w-full h-32 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none text-sm transition-all"
-                placeholder="Paste the target role description here..."
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-              />
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground italic">Target Job Description (Optional)</label>
+                <button 
+                  onClick={() => setUseJdFile(!useJdFile)}
+                  className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider"
+                >
+                  {useJdFile ? "Switch to Text Input" : "Upload JD as PDF"}
+                </button>
+              </div>
+              
+              {useJdFile ? (
+                <div className="border-2 border-dashed border-white/10 hover:border-primary/40 bg-black/10 rounded-xl transition-all flex flex-col items-center justify-center relative py-6 cursor-pointer">
+                  <input type="file" accept=".pdf" onChange={(e) => setJdFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  <FileText className="w-6 h-6 text-primary/60 mb-2" />
+                  {jdFile ? (
+                    <p className="text-white text-xs font-bold">{jdFile.name}</p>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">Drop JD PDF here</p>
+                  )}
+                </div>
+              ) : (
+                <textarea 
+                  className="w-full h-32 bg-black/20 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none text-sm transition-all shadow-inner"
+                  placeholder="Paste the target role description here for targeted matching..."
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                />
+              )}
             </div>
 
             <div className="mb-8 border-2 border-dashed border-white/20 hover:border-primary/50 bg-black/20 rounded-xl transition-colors flex flex-col items-center justify-center relative py-10 cursor-pointer">
@@ -140,11 +173,11 @@ export default function ResumeHub() {
 
             <button 
               onClick={handleAnalyze}
-              disabled={!file || !jobDescription || isAnalyzing}
+              disabled={!file || isAnalyzing}
               className="w-full py-4 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl font-bold transition-all shadow-md shadow-primary/20 flex items-center justify-center gap-2"
             >
               {isAnalyzing ? <RefreshCcw className="w-5 h-5 animate-spin" /> : <Target className="w-5 h-5" />}
-              {isAnalyzing ? "Executing Neural Match..." : "Score My Resume"}
+              {isAnalyzing ? "Executing AI Analysis..." : "Score My Resume"}
             </button>
           </div>
         </div>
@@ -225,7 +258,7 @@ export default function ResumeHub() {
           <div className="flex gap-2">
             {[
               { id: 'SIDE_BY_SIDE', label: 'SIDE BY SIDE', icon: <LayoutPanelLeft className="w-4 h-4" /> },
-              { id: 'JD', label: 'JOB DESCRIPTION', icon: <FileText className="w-4 h-4" /> },
+              ...(jobDescription ? [{ id: 'JD', label: 'JOB DESCRIPTION', icon: <FileText className="w-4 h-4" /> }] : []),
               { id: 'RESUME', label: 'YOUR RESUME', icon: <Target className="w-4 h-4" /> },
               { id: 'CHANGES', label: 'CHANGES', icon: <RefreshCcw className="w-4 h-4" /> }
             ].map(tab => (
@@ -242,10 +275,10 @@ export default function ResumeHub() {
 
         <div className="flex-1 overflow-y-auto p-10">
           
-          {(activeTab === 'JD' || activeTab === 'SIDE_BY_SIDE') && (
+          {jobDescription && (activeTab === 'JD' || activeTab === 'SIDE_BY_SIDE') && (
             <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
               <div>
-                <h3 className="text-sm font-bold uppercase text-muted-foreground tracking-widest mb-4">Job Description</h3>
+                <h3 className="text-sm font-bold uppercase text-muted-foreground tracking-widest mb-4">Job Description Analysis</h3>
                 <div className="glass-card border border-white/10 shadow-sm rounded-xl p-8 bg-black/20">
                   {renderHighlightedJD()}
                 </div>
