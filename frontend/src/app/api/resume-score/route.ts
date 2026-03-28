@@ -5,10 +5,7 @@ import path from 'path';
 
 export async function POST(req: NextRequest) {
   try {
-    // Explicitly set the pdf-parse worker source for Next.js environment
-    // Correctly resolve the path within the Docker container (/app)
-    const workerPath = path.join(process.cwd(), 'node_modules/pdf-parse/dist/pdf-parse/esm/pdf.worker.mjs');
-    PDFParse.setWorker(workerPath);
+    // Use default internal worker for serverless compatibility
 
     const formData = await req.formData();
     const resumeFile = formData.get('resume') as File | null;
