@@ -18,7 +18,7 @@ export default function CareerStrategist() {
     setCoverLetter("Synthesizing...");
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/cover-letter`, {
+      const res = await fetch(`/api/cover-letter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target_job: targetJob, resume_text: resumeText, only_map: false })
@@ -48,7 +48,7 @@ export default function CareerStrategist() {
     if (!targetJob || targetJob === lastSyncedTarget) return;
     setIsSyncing(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/cover-letter`, {
+      const res = await fetch(`/api/cover-letter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target_job: targetJob, resume_text: resumeText, only_map: true })
