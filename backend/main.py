@@ -3,14 +3,20 @@ import json
 import io
 import httpx
 import asyncio
-from typing import Annotated
+from typing import Annotated, Optional, List
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from pypdf import PdfReader
 from openai import AsyncOpenAI
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
+from reportlab.lib import colors
+import google.generativeai as genai
 
 docs_dir = Path(__file__).parent / "resume_docs"
 docs_dir.mkdir(exist_ok=True)
@@ -53,15 +59,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize OpenAI client if key is available
+# Initialize OpenAI client
 openai_client = None
 if os.getenv("OPENAI_API_KEY") and not os.getenv("OPENAI_API_KEY").startswith("your_"):
     try:
         openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        print("INFO: OpenAI engine initialized.")
     except Exception as e:
-        print(f"ERROR: Failed to initialize OpenAI client: {e}")
-else:
-    print("WARNING: OPENAI_API_KEY missing or invalid in environment. System will use mock fallback.")
+        print(f"ERROR: Failed to initialize OpenAI: {e}")
+
+# Initialize Gemini client
+gemini_model = None
+if os.getenv("GEMINI_API_KEY"):
+    try:
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+        # Optimized model selection: Focus on Gemini 1.5/2.0 which support JSON Mode
+        # Explicitly avoid legacy models like gemma-1b which don't support response_mime_type
+        for m_short in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-pro']:
+            for m_name in [m_short, f"models/{m_short}"]:
+                try:
+                    # Initialize
+                    model = genai.GenerativeModel(m_name)
+                    # Verify functional & JSON support
+                    _ = model.generate_content("test", generation_config={"response_mime_type": "application/json"})
+                    gemini_model = model
+                    print(f"INFO: High-fidelity {m_name} engine active.")
+                    break
+                except Exception as e:
+                    # Silently skip incompatible models
+                    continue
+            if gemini_model: break
+        
+        if not gemini_model:
+            print("WARNING: All Gemini models failed validation. Entering Robust Mock Mode.")
+    except Exception as e:
+        print(f"ERROR: Gemini SDK Initialization failed: {e}")
 
 # Add fallback mocks
 def get_mock_resume_analysis():
@@ -870,62 +902,321 @@ class InterviewRequest(BaseModel):
     message: str
     history: list[dict] = []
     target_role: str = "software engineering"
+    resume_text: str = ""
+    jd_text: str = ""
+    company_name: str = ""
+    web_context: str = ""
+
+async def get_ai_completion(messages: list, response_format: str = "text"):
+    """
+    Robust completion helper with OpenAI -> Gemini fallback hierarchy.
+    """
+    # 1. Try OpenAI
+    if openai_client:
+        try:
+            params = {
+                "model": "gpt-4o",
+                "messages": messages,
+            }
+            if response_format == "json_object":
+                params["response_format"] = {"type": "json_object"}
+            
+            response = await openai_client.chat.completions.create(**params)
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI Failed (Falling back to Gemini): {e}")
+
+    # 2. Try Gemini
+    if gemini_model:
+        try:
+            # Reformat messages for Gemini
+            prompt = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in messages])
+            gen_config = {}
+            if response_format == "json_object":
+                gen_config["response_mime_type"] = "application/json"
+            
+            response = gemini_model.generate_content(prompt, generation_config=gen_config)
+            return response.text
+        except Exception as e:
+            print(f"Gemini Failed: {e}")
+
+    return None
 
 @app.post("/api/interview/chat")
 async def interview_chat(request: InterviewRequest):
     """
-    Real-time AI Interview Bot. Takes user speech transcript, responds with next question,
-    and provides real-time analysis of their answer.
+    Real-time AI Interview Bot with multi-model fallback and 'Repetition Guard'.
     """
-    if not openai_client:
-        await asyncio.sleep(1)
-        return {
-            "reply": f"That's a great point. How does your experience align specifically with the {request.target_role} requirements?",
-            "analysis": {
-                "filler_words": "Low",
-                "speaking_pace": "Optimal",
-                "confidence_score": 92,
-                "tip": "Good detail. Try to use the STAR method to structure your next response."
-            }
-        }
-
     system_prompt = f"""
-    You are an AI Technical Interviewer conducting a mock interview for a {request.target_role} role.
-    You must evaluate the user's latest response and ask the NEXT exceptionally relevant, deep-dive technical question based strictly on standard expectations for a {request.target_role}.
-    Also, provide a short live analysis of their response quality.
-    Respond strictly in JSON:
+    You are an Elite AI Technical Interviewer at {request.company_name or 'a FAANG-level firm'}. 
+    This is a structured **1-HOUR TECHNICAL INTERVIEW** for the {request.target_role} position.
+    
+    CONTEXT:
+    - Candidate Resume: {request.resume_text[:3000]}
+    - Job Description: {request.jd_text[:3000]}
+    - Web Intelligence (GFG/Medium): {request.web_context}
+    
+    STRUCTURED PHASES (Calibrated for 60 Minutes):
+    1. **Phase 1: Intro & Context (Minutes 0-10)**: Aligning background with the role.
+    2. **Phase 2: Project Probing (Minutes 10-25)**: DEEP-DIVE into resume projects. Ask about implementation details, bottlenecks, and "Why X over Y?". Reject vague descriptions.
+    3. **Phase 3: Deep Technical Skills (Minutes 25-45)**: Match candidate against JD requirements. Probe for depth in their claimed tech stack (e.g. Memory management in Python, React Server Component trade-offs).
+    4. **Phase 4: DSA & Scalability (Minutes 45-55)**: Verbal algorithmic challenges or System Design (e.g., 'How would you scale this to 10M users?').
+    5. **Phase 5: Closing (Minutes 55-60)**: Wrap up and final questions.
+
+    CRITICAL INSTRUCTIONS:
+    - EVALUATE BEFORE PROCEEDING: You MUST first judge if the candidate's last answer was professional, relevant, and technically sufficient. 
+    - RELEVANCY GUARD: If the candidate is "blabbering" (nonsensical description), off-topic, or provides a technically incorrect explanation, YOU MUST CALL IT OUT. 
+    - If they provide a "lazy" or "anonymous" answer that doesn't align with the question context: Penalize the `confidence_score` (down to 10-30%), set `hiring_signal` to 'No Hire' for this turn, and ask them to explain the specific technical concept again.
+    - DO NOT REPEAT QUESTIONS. Review history carefully.
+    - BE RUTHLESS. If an answer is shallow, explicitly call it out.
+    - DYNAMIC FEEDBACK: Every turn's `analysis` must accurately reflect the quality of the LAST answer.
+    
+    Respond STRICTLY in JSON:
     {{
-      "reply": "<Your exact spoken response/question>",
+      "reply": "<Your spoken response/question>",
       "analysis": {{
         "filler_words": "<Low/Medium/High>",
         "speaking_pace": "<Fast/Optimal/Slow>",
         "confidence_score": <int 0-100>,
-        "tip": "<One short sentence of actionable feedback on their last answer>"
+        "hiring_signal": "<Strong Hire/Hire/Leaning No Hire/No Hire>",
+        "tip": "<Ruthless feedback. Explain if they were too brief or if they missed a technical nuance.>",
+        "current_phase": "<Intro/Projects/Technical/DSA/Closing>"
       }}
     }}
     """
 
     messages = [{"role": "system", "content": system_prompt}]
-    for msg in request.history[-5:]:
+    for msg in request.history[-10:]:
         messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
     
     messages.append({"role": "user", "content": request.message})
 
-    try:
-        response = await openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            response_format={"type": "json_object"}
-        )
-        return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        print(f"Error calling OpenAI Interview API: {e}")
+    content = await get_ai_completion(messages, response_format="json_object")
+    
+    if content:
+        try:
+            return json.loads(content)
+        except Exception:
+            pass
+
+    ROLE_BANKS = {
+        "fullstack": [
+            "How do you optimize React performance for a dashboard with 10k+ live data points?",
+            "Explain the trade-offs between Client-Side Rendering (CSR) and Server-Side Rendering (SSR) in Next.js 14.",
+            "How would you design a scalable notification system that handles 1M pushes per minute?",
+            "What is your approach to ensuring ACID properties in a distributed microservices environment?",
+            "Can you walk me through your process for debugging a memory leak in a Node.js production server?"
+        ],
+        "default": [
+            "Walk me through a complex architectural decision you made and its long-term impact.",
+            "How do you handle technical debt while meeting tight product deadlines?",
+            "Explain a time you had to optimize a slow database query in production. What was your methodology?",
+            "Describe a situation where you had to lead a project with ambiguous requirements.",
+            "How do you ensure data consistency across multiple independent services?"
+        ]
+    }
+    
+    role_key = "fullstack" if "fullstack" in request.target_role.lower() else "default"
+    QUESTIONS = ROLE_BANKS.get(role_key, ROLE_BANKS["default"])
+    
+    # 1. Semantic Awareness (Cognitive Mocking V10)
+    msg_lower = request.message.lower()
+    is_lazy = len(request.message.strip()) < 15
+    is_apologetic = any(x in msg_lower for x in ['sorry', 'don\'t know', 'i forget', 'no idea'])
+    
+    # 2. Blabbering Detection (Off-topic)
+    tech_keywords = ['react', 'node', 'ssr', 'system', 'api', 'performance', 'database', 'sql', 'scaling', 'microservices', 'star', 'code', 'quality', 'bottleneck', 'optimization', 'frontend', 'backend', 'fullstack']
+    has_tech_context = any(kw in msg_lower for kw in tech_keywords)
+    is_blabbering = len(request.message.strip()) > 30 and not has_tech_context
+
+    if is_lazy or is_apologetic or is_blabbering:
+        signal = "No Hire" if is_blabbering else "Leaning No Hire"
+        tip = "AI Strategic Guard: You are 'blabbering' or off-topic. In a real interview, this is a major red flag. Focus on the technical question asked." if is_blabbering else "AI Strategic Guard: You provided a very brief or apologetic answer. Try to elaborate even if you are unsure."
         return {
-            "reply": "I see. Let's move on to the next question. Can you describe a complex bug you fixed?",
+            "reply": "Wait, I notice you are going slightly off-topic. Let's refocus on the technical implementation. Can you provide a STAR-method explanation for the specific question I asked?",
             "analysis": {
-                "filler_words": "Medium",
-                "speaking_pace": "Optimal",
-                "confidence_score": 85,
-                "tip": "Audio analyzed: clear pronunciation, but try to be more concise."
+                "filler_words": "High" if is_blabbering else "Low",
+                "speaking_pace": "Sub-optimal" if is_blabbering else "Optimal",
+                "confidence_score": 15 if is_blabbering else 40,
+                "hiring_signal": signal,
+                "tip": tip,
+                "current_phase": "Technical Relevancy Warning"
             }
         }
+
+    fallback_index = (len(request.history) // 2) % len(QUESTIONS)
+    return {
+        "reply": QUESTIONS[fallback_index],
+        "analysis": {
+            "filler_words": random.choice(["Low", "Medium"]),
+            "speaking_pace": random.choice(["Optimal", "Good", "Balanced"]),
+            "confidence_score": random.randint(70, 92),
+            "hiring_signal": random.choice(["Hire", "Strong Hire", "Solid Candidate"]),
+            "tip": f"AI Fallback Mode Active (v9). Please be specific about implementation details while your connection stabilizes.",
+            "current_phase": "Technical Deep-Dive"
+        }
+    }
+
+class FinalizeRequest(BaseModel):
+    history: list[dict]
+    resume_text: str = ""
+    jd_text: str = ""
+    target_role: str = ""
+    company_name: str = ""
+    web_context: str = ""
+
+@app.post("/api/interview/analysis")
+async def interview_analysis(request: FinalizeRequest):
+    """
+    Returns a JSON verdict and predicted questions without PDF generation.
+    """
+    data = {"verdict": {"decision": "Hire - Technical Assessment Pending", "justification": "AI was in fallback mode during this session. Based on your resume and JD, you showed strong potential, but deep technical probing was limited by API connectivity."}, "predictions": []}
+    
+    if openai_client or gemini_model:
+        prediction_prompt = f"""
+        Analyze the following interview transcript and candidate background.
+        
+        1. Provide a FINAL HIRING VERDICT: Strong Hire, Hire, Leaning No Hire, or No Hire.
+        2. Provide a 3-4 sentence justification.
+        3. Provide 15+ highly predicted technical and behavioral questions for {request.target_role}.
+        
+        RESUME: {request.resume_text[:2000]}
+        TRANSCRIPT: {str(request.history)}
+        
+        Format as STRICT JSON:
+        {{
+          "verdict": {{ "decision": "...", "justification": "..." }},
+          "predictions": [
+            {{ "question": "...", "ideal_answer": "..." }}
+          ]
+        }}
+        """
+        try:
+            raw_data = await get_ai_completion([{"role": "user", "content": prediction_prompt}], response_format="json_object")
+            if raw_data:
+                data = json.loads(raw_data)
+        except Exception as e:
+            print(f"Analysis AI Error: {e}")
+            pass
+    return data
+
+@app.post("/api/interview/finalize")
+async def interview_finalize(request: FinalizeRequest):
+    """
+    Generates the final PDF report.
+    """
+    # Use the analysis logic to get data for the PDF
+    data = await interview_analysis(request)
+    predictions = data.get("predictions", [])
+    if not predictions:
+        predictions = [{"question": "Can you elaborate on your most difficult project?", "ideal_answer": "STAR method answer..."}]
+
+    try:
+        # 2. Generate PDF using ReportLab
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        # Header
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(width/2, height - 50, "Interview Mastery: Performance Report")
+        c.setFont("Helvetica", 10)
+        c.drawCentredString(width/2, height - 70, f"Tailored for {request.target_role} | {request.company_name or 'Confidential'}")
+        
+        y = height - 100
+        
+        # Hiring Verdict
+        verdict = data.get("verdict", {})
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.black)
+        c.drawString(50, y, "FINAL ASSESSMENT & HIRING VERDICT")
+        y -= 25
+        c.setFont("Helvetica-Bold", 12)
+        c.setFillColor(colors.blue)
+        c.drawString(50, y, f"Decision: {verdict.get('decision', 'N/A')}")
+        y -= 15
+        c.setFont("Helvetica", 10)
+        c.setFillColor(colors.black)
+        v_lines = simpleSplit(verdict.get("justification", ""), "Helvetica", 10, width - 100)
+        for line in v_lines:
+            c.drawString(60, y, line)
+            y -= 12
+        y -= 25
+
+        # Predicted Q&A
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, y, "Master Question Bank & Ideal STAR Responses")
+        y -= 30
+        
+        for i, item in enumerate(predictions):
+            if y < 100:
+                c.showPage()
+                y = height - 50
+            
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(50, y, f"Q{i+1}: {item.get('question', '...')}")
+            y -= 15
+            
+            c.setFont("Helvetica", 10)
+            ideal_answer = item.get('ideal_answer', '...')
+            lines = simpleSplit(ideal_answer, "Helvetica", 10, width - 100)
+            for line in lines:
+                if y < 50:
+                    c.showPage()
+                    y = height - 50
+                c.drawString(60, y, line)
+                y -= 12
+            y -= 15
+            
+        c.save()
+        buffer.seek(0)
+        
+        headers = { 'Content-Disposition': f'attachment; filename="Interview_Guide_{request.company_name or "Pro"}.pdf"' }
+        return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+
+    except Exception as e:
+        print(f"PDF Generation Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interview/start")
+async def start_interview(
+    target_role: str = Form(...),
+    company_name: str = Form(None),
+    resume_pdf: UploadFile = File(...),
+    jd_pdf: Optional[UploadFile] = File(None)
+):
+    """
+    Initializes the interview by extracting PDF text and fetching real-world web context.
+    """
+    # 1. Extract Resume Text
+    resume_content = await resume_pdf.read()
+    resume_reader = PdfReader(io.BytesIO(resume_content))
+    resume_text = "\n".join([page.extract_text() for page in resume_reader.pages if page.extract_text()])
+    
+    # 2. Extract JD Text (Optional)
+    jd_text = ""
+    if jd_pdf:
+        jd_content = await jd_pdf.read()
+        jd_reader = PdfReader(io.BytesIO(jd_content))
+        jd_text = "\n".join([page.extract_text() for page in jd_reader.pages if page.extract_text()])
+    
+    # 3. Web Context Generation (Simulated Web Intelligence based on LLM knowledge + Search)
+    web_context = ""
+    research_prompt = f"""
+    Provide a concise summary (3-4 sentences) of the most recently reported interview questions and technical focus areas for a {target_role} at {company_name or 'top tech companies'} based on GeeksforGeeks, Medium, and Glassdoor reports from 2024-2025.
+    Focus on: Specific DS/Algo patterns, System Design focus, and frequently asked behavioral questions.
+    """
+    
+    messages = [{"role": "system", "content": research_prompt}]
+    web_context = await get_ai_completion(messages)
+    
+    if not web_context:
+        web_context = f"Focus on core engineering principles and {target_role} specific technical challenges."
+
+    return {
+        "resume_text": resume_text,
+        "jd_text": jd_text,
+        "web_context": web_context,
+        "role": target_role,
+        "company": company_name
+    }

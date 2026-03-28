@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { LayoutDashboard, FileText, Bot, Target, Settings, LogOut, Search, Repeat, Menu, X } from "lucide-react";
+import { LayoutDashboard, FileText, Bot, Target, Settings, LogOut, Search, Repeat, Menu, X, Zap } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -97,6 +97,7 @@ export default function DashboardLayout({
                 <NavItem href="/dashboard/resume" icon={<FileText className="w-4 h-4" />} label="ATS Resume Hub" active={pathname === "/dashboard/resume"} />
                 <NavItem href="/dashboard/cover-letter" icon={<Target className="w-4 h-4" />} label="Career Strategist" active={pathname === "/dashboard/cover-letter"} />
                 <NavItem href="/dashboard/interview" icon={<Bot className="w-4 h-4" />} label="Mock Interviews" active={pathname === "/dashboard/interview"} />
+                <NavItem href="/dashboard/pricing" icon={<Zap className="w-4 h-4" />} label="Pricing" active={pathname === "/dashboard/pricing"} />
               </>
             )}
 

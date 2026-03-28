@@ -97,7 +97,7 @@ export default async function DashboardPage() {
         <div className="flex-1">
           <h4 className="font-bold text-white text-sm uppercase tracking-wider mb-1">Offer: Get 75% Off Pro</h4>
           <p className="text-sm text-blue-200 mb-3">Unlock AI-powered resume writing, unlimited reviews, ATS optimization, and expert tools.</p>
-          <Link href="/pricing" className="inline-block bg-primary hover:bg-primary/90 text-white text-xs font-bold uppercase tracking-wider py-2 px-4 rounded transition-colors shadow-[0_0_15px_rgba(59,130,246,0.3)]">Upgrade to Pro</Link>
+          <Link href="/dashboard/pricing" className="inline-block bg-primary hover:bg-primary/90 text-white text-xs font-bold uppercase tracking-wider py-2 px-4 rounded transition-colors shadow-[0_0_15px_rgba(59,130,246,0.3)]">Upgrade to Pro</Link>
         </div>
       </div>
 
