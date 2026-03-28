@@ -51,6 +51,11 @@ else:
 
 app = FastAPI(title="CareerSync Pro API", version="1.0.0")
 
+@app.get("/")
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "engine": "CareerSync Pro V12"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1266,8 +1271,30 @@ async def score_resume(
         # Use existing AI completion logic (handles Gemini fallback already)
         raw_json = await get_ai_completion(messages, response_format="json_object")
         
+        # 3. Robust Response Handling (V12.1 Fix)
+        if not raw_json:
+            print("WARNING: AI analysis returned None. Falling back to robust mock scoring.")
+            # Use the existing mock generator but ensure it matches the AI schema
+            mock_data = get_mock_resume_analysis()
+            return {
+                "ats_score": mock_data.get("ats_score", 70),
+                "score_breakdown": { "keyword_match": 15, "formatting": 8, "quantified_achievements": 20, "section_completeness": 12, "action_verbs": 10 },
+                "detailed_checks": [ { "name": "AI Connection", "score": 2, "status": "warning", "feedback": "AI engine is currently offline. Showing estimated scores." } ],
+                "critical_issues": ["Fix AI API Quota"],
+                "improvements": [{"category": "Impact", "priority": "High", "issue": "Missing data", "suggestion": "Check Gemini API Keys", "example": "N/A"}],
+                "missing_keywords": ["Connectivity"],
+                "strong_points": ["System is online"],
+                "rewritten_bullets": [],
+                "overall_verdict": "Backend is online but AI is offline. Using local heuristics.",
+                "segmented_resume": [ { "text": extracted_text[:200] + "...", "label": "neutral", "comment": "AI analysis skipped due to quota limits." } ]
+            }
+            
         # Parse and return
-        return json.loads(raw_json)
+        try:
+            return json.loads(raw_json)
+        except Exception as parse_err:
+            print(f"JSON Parse Error: {parse_err}. Raw output: {raw_json}")
+            raise HTTPException(status_code=500, detail="AI output format was invalid. Please try again.")
 
     except Exception as e:
         print(f"Resume Scoring Error: {e}")
