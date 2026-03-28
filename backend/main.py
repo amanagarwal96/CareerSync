@@ -1220,3 +1220,55 @@ async def start_interview(
         "role": target_role,
         "company": company_name
     }
+
+@app.post("/api/resume/score")
+async def score_resume(
+    resume: UploadFile = File(...),
+    jobDescription: Optional[str] = Form(None)
+):
+    """
+    Performs high-fidelity ATS scoring using the backend's robust PDF engine.
+    """
+    try:
+        # 1. Extract Text using pypdf (No browser globals needed)
+        content = await resume.read()
+        reader = PdfReader(io.BytesIO(content))
+        extracted_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+        
+        if not extracted_text or len(extracted_text.strip()) < 100:
+            raise HTTPException(status_code=400, detail="Could not extract sufficient text from PDF.")
+
+        # 2. FAANG Recruitment System Prompt
+        system_prompt = """Act as a senior, ruthless FAANG Technical Recruiter and ATS Auditor. Your goal is to provide a STERN, industry-standard assessment.
+        
+        SCORING RULES:
+        - NO quantified metrics (%, $, numbers) = Score CAP 65.
+        - Penalize Weak Verbs ('assisted', 'helped').
+        - Penalize Buzzwords ('motivated', 'team player').
+        
+        Respond ONLY in valid JSON format:
+        {
+          "ats_score": 0-100,
+          "score_breakdown": { "keyword_match": 0-25, "formatting": 0-10, "quantified_achievements": 0-40, "section_completeness": 0-15, "action_verbs": 0-10 },
+          "detailed_checks": [ { "name": "Readability", "score": 0-10, "status": "pass", "feedback": "..." } ],
+          "critical_issues": [], "improvements": [], "missing_keywords": [], "strong_points": [], 
+          "rewritten_bullets": [], "overall_verdict": "...",
+          "segmented_resume": [ { "text": "...", "label": "impactful"|"weak"|"irrelevant", "comment": "..." } ]
+        }"""
+        
+        user_prompt = f"RESUME TEXT:\n{extracted_text}\n\nJD/Context:\n{jobDescription or 'General Fullstack/Backend role'}"
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # Use existing AI completion logic (handles Gemini fallback already)
+        raw_json = await get_ai_completion(messages, response_format="json_object")
+        
+        # Parse and return
+        return json.loads(raw_json)
+
+    except Exception as e:
+        print(f"Resume Scoring Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
