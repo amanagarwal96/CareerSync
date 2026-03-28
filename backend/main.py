@@ -104,17 +104,34 @@ if os.getenv("GEMINI_API_KEY"):
 def get_mock_resume_analysis():
     import random
     return {
-        "ats_score": random.randint(65, 85),
-        "keyword_gaps": ["React Server Components", "Redis", "System Design", "Cloud Infrastructure"],
-        "enhancement_suggestions": [
-            {
-                "original": "Worked on backend tasks",
-                "improved": "Architected distributed systems using Redis, reducing latency by 45%",
-                "reason": "Adding metrics and specific technologies."
-            }
+        "ats_score": random.randint(72, 84),
+        "score_breakdown": {
+            "keyword_match": 18, 
+            "formatting": 8, 
+            "quantified_achievements": 22, 
+            "section_completeness": 13, 
+            "action_verbs": 9
+        },
+        "detailed_checks": [
+            { "name": "Scan-ability", "score": 9, "status": "pass", "feedback": "Clean layout detected." },
+            { "name": "Quantification", "score": 4, "status": "fail", "feedback": "Missing $/% metrics in 60% of bullets." },
+            { "name": "Action Verbs", "score": 7, "status": "warning", "feedback": "Avoid 'Responsible for' syntax." }
         ],
-        "message": "AI Backend Offline (Quota Exceeded or Key Invalid). Using fallback analysis.",
-        "extracted_text": "Sample uploaded resume text... Worked on backend caching... I did a lot of things... Python and React..."
+        "critical_issues": ["Low quantification of impact", "Missing cloud-native keywords"],
+        "improvements": [
+            {"category": "Impact", "priority": "High", "issue": "Vague achievements", "suggestion": "Add specific numbers.", "example": "Increased efficiency by 30% using Redis."}
+        ],
+        "missing_keywords": ["Docker", "Kubernetes", "AWS Lambda", "CI/CD", "System Design"],
+        "strong_points": ["Consistent date formatting", "Clear section headers"],
+        "rewritten_bullets": [
+            {"original": "Worked on backend features", "improved": "Architected Go-based microservices, improving throughput by 40%."}
+        ],
+        "overall_verdict": "Solid foundation. Needs move needle-moving metrics to reach FAANG/Elite tiers.",
+        "segmented_resume": [
+            { "text": "Education: Bachelor of Technology...", "label": "neutral", "comment": "Standard formatting." },
+            { "text": "Projects: Built a chat app...", "label": "weak", "comment": "Add tech stack and user metrics." }
+        ],
+        "message": "AI Engine Offline. Using Elite Heuristics."
     }
 
 def get_resume_highlights(text):
