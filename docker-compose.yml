@@ -28,7 +28,7 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/careersync
+      - DATABASE_URL=postgresql://postgres:REPLACE_WITH_SECURE_PASSWORD@db:5432/careersync
       - REDIS_URL=redis://redis:6379/0
     env_file:
       - ./backend/.env
@@ -42,7 +42,7 @@ services:
       - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=REPLACE_WITH_SECURE_PASSWORD
       - POSTGRES_DB=careersync
     volumes:
       - postgres_data:/var/lib/postgresql/data

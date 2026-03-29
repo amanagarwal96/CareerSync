@@ -5,7 +5,14 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 
-export async function saveResumeAnalysis(data: { atsScore: number, content: string, gaps: string }) {
+export async function saveResumeAnalysis(data: { 
+  atsScore: number, 
+  content: string, 
+  gaps: string,
+  fileName?: string,
+  jdSimilarity?: number,
+  jdGaps?: string
+}) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return { success: false, error: "Not logged in" }
   
@@ -19,6 +26,9 @@ export async function saveResumeAnalysis(data: { atsScore: number, content: stri
         atsScore: data.atsScore,
         content: data.content,
         keywordGaps: data.gaps,
+        fileName: data.fileName,
+        jdSimilarity: data.jdSimilarity,
+        jdGaps: data.jdGaps,
       }
     })
     revalidatePath('/dashboard')

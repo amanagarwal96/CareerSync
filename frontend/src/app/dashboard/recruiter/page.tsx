@@ -22,7 +22,7 @@ export default function RecruiterVerification() {
       formData.append("resume_file", file);
       if (jdFile) formData.append("jd_file", jdFile);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/recruiter-verify`, {
+      const res = await fetch(`/api/recruiter/verify`, {
         method: "POST",
         body: formData,
       });

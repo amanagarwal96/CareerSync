@@ -70,6 +70,9 @@ model Resume {
   content     String
   atsScore    Int?
   keywordGaps String?
+  fileName    String?
+  jdSimilarity Float?
+  jdGaps      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   

@@ -5,10 +5,12 @@ import pdfplumber
 import httpx
 import asyncio
 import re
+import numpy as np
+from datetime import datetime, timezone
 from typing import Annotated, Optional, List, Dict
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -20,6 +22,22 @@ from reportlab.lib.utils import simpleSplit
 from reportlab.lib import colors
 from google import genai
 import fitz  # PyMuPDF
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+# Initialize Sentry if DSN is provided
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        integrations=[FastApiIntegration()],
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 docs_dir = Path(__file__).parent / "resume_docs"
 docs_dir.mkdir(exist_ok=True)
@@ -301,24 +319,143 @@ if os.path.exists(env_path):
 else:
     load_dotenv()
 
-app = FastAPI(title="CareerSync Pro API", version="1.0.0")
 
-@app.get("/")
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok",
-        "engine": "CareerSync Pro Forensic V25",
-        "parsers": ["fitz", "pdfplumber"]
-    }
+# ─────────────────────────────────────────────
+# RATE LIMITER + APP INITIALIZATION
+# ─────────────────────────────────────────────
+limiter = Limiter(
+    key_func=get_remote_address, 
+    default_limits=["60/minute"],
+    storage_uri=os.getenv("REDIS_URL", "memory://")
+)
+
+app = FastAPI(title="CareerSync Pro API v3.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ─────────────────────────────────────────────
+# CORS — locked to configured origins
+# ─────────────────────────────────────────────
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://frontend:3000").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─────────────────────────────────────────────
+# FILE VALIDATION HELPER
+# ─────────────────────────────────────────────
+MAX_PDF_SIZE = 5 * 1024 * 1024  # 5 MB
+
+def validate_pdf_upload(content: bytes, filename: str):
+    """Raises HTTPException if the file is not a valid PDF or is too large."""
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=415, detail="Only PDF files are accepted.")
+    if len(content) > MAX_PDF_SIZE:
+        raise HTTPException(status_code=413, detail="File size exceeds the 5 MB limit.")
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=415, detail="File does not appear to be a valid PDF.")
+
+# ─────────────────────────────────────────────
+# JD COSINE SIMILARITY ENGINE (scikit-learn)
+# ─────────────────────────────────────────────
+def compute_jd_cosine_similarity(resume_text: str, jd_text: str) -> dict:
+    """
+    Uses TF-IDF vectorization + Cosine Similarity to compute a
+    mathematically grounded JD match score.
+    Returns: { score (0-100), top_missing_keywords }
+    """
+    if not jd_text or not resume_text:
+        return {"score": 0, "top_missing_keywords": []}
+
+    try:
+        corpus = [resume_text.lower(), jd_text.lower()]
+        vectorizer = TfidfVectorizer(
+            stop_words="english",
+            ngram_range=(1, 2),  # unigrams + bigrams for better phrase matching
+            max_features=500,
+            sublinear_tf=True
+        )
+        tfidf_matrix = vectorizer.fit_transform(corpus)
+        score = float(cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0])
+        similarity_pct = round(score * 100, 1)
+
+        # Find top missing keywords (high JD weight, low resume weight)
+        feature_names = np.array(vectorizer.get_feature_names_out())
+        resume_vec = tfidf_matrix[0].toarray()[0]
+        jd_vec = tfidf_matrix[1].toarray()[0]
+
+        # Keywords that are important in JD but absent/low in resume
+        gap_scores = jd_vec - resume_vec
+        top_gap_indices = gap_scores.argsort()[::-1][:15]
+        top_missing = [
+            feature_names[i] for i in top_gap_indices
+            if gap_scores[i] > 0.01 and len(feature_names[i]) > 3
+        ][:10]
+
+        return {"score": similarity_pct, "top_missing_keywords": top_missing}
+    except Exception as e:
+        print(f"Cosine Similarity Error: {e}")
+        return {"score": 0, "top_missing_keywords": []}
+
+# ─────────────────────────────────────────────
+# GITHUB DEPTH SCORING
+# ─────────────────────────────────────────────
+# GITHUB DEPTH SCORING (Production Logic)
+# ─────────────────────────────────────────────
+async def compute_github_depth_score(github_handle: str) -> float:
+    """
+    Analyzes GitHub profile/repo activity to calculate a technical depth score.
+    Factors: Total Public Commits (30%), Repository Stars (20%), Push Recency (50%).
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"Accept": "application/vnd.github.v3+json"}
+            token = os.getenv("GITHUB_TOKEN")
+            if token and not token.startswith("your_"):
+                headers["Authorization"] = f"token {token}"
+                
+            # Fetch user repos (up to 100)
+            url = f"https://api.github.com/users/{github_handle}/repos?per_page=100&sort=updated"
+            response = await client.get(url, headers=headers)
+            
+            if response.status_code != 200:
+                return 0.0
+
+            repos = response.json()
+            if not repos:
+                return 0.0
+
+            total_stars = sum(r.get("stargazers_count", 0) for r in repos)
+            
+            # Recency: How many months since last active?
+            last_push_str = repos[0].get("pushed_at")
+            recency_score = 0
+            if last_push_str:
+                last_push = datetime.strptime(last_push_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                delta = datetime.now(timezone.utc) - last_push
+                months_ago = delta.days / 30
+                # 100 if active today, 0 if active 12+ months ago
+                recency_score = max(0, 100 - (months_ago * 8.33))
+
+            # Stars: 100 if >10 stars total (modest benchmark for interns/juniors)
+            star_score = min(100, (total_stars / 10) * 100)
+            
+            # Commit Volume (simplified Proxy via repo count for now)
+            # A more accurate version would call /search/commits or sum individual repo commit counts
+            repo_score = min(100, (len(repos) / 10) * 100)
+
+            # Combined Weighted Score
+            final_score = (recency_score * 0.5) + (star_score * 0.2) + (repo_score * 0.3)
+            return round(final_score, 1)
+
+    except Exception as e:
+        print(f"DEBUG: GitHub Scoring Internal Error: {e}")
+        return 0.0
 
 # Initialize OpenAI client
 openai_client = None
@@ -801,7 +938,9 @@ async def generate_cover_letter(request: CoverLetterRequest):
         return get_career_strategist_fallback(request)
 
 @app.post("/api/recruiter-verify")
+@limiter.limit("5/minute")
 async def recruiter_verify(
+    request: Request,
     github_handle: str = Form(...),
     resume_file: UploadFile = File(None),
     resume_text: str = Form(None),
@@ -811,6 +950,17 @@ async def recruiter_verify(
     Recruiter Engine: Extracts skills from a resume, fetches GitHub repositories, 
     and cross-references them to generate a true confidence verification score.
     """
+    # 0. Production Guard: File Validation
+    if resume_file:
+        content = await resume_file.read()
+        validate_pdf_upload(content, resume_file.filename)
+        # Reset file pointer for subsequent read (if needed, though we already have content)
+        # We'll use the 'content' variable directly below
+    
+    if jd_file:
+        jd_content = await jd_file.read()
+        validate_pdf_upload(jd_content, jd_file.filename)
+        # We can extract text from JD here if needed for similarity match in recruiter hub
     # 0. Core NLP Skill Dictionary for Offline Scanning
     PREDEFINED_SKILLS = [
         "python", "java", "c++", "c", "c#", "javascript", "typescript", "react", "angular", "vue", 
@@ -930,8 +1080,17 @@ async def recruiter_verify(
     gh_handle_lower = github_handle.lower()
     text_lower = extracted_text.lower()
     
-    # FRAUD LAYER 1: Link Authenticity (Did they actually write this GitHub URL in their resume?)
-    if gh_handle_lower not in text_lower:
+    # FRAUD LAYER 1: Link Authenticity (Plain text OR hyperlink match)
+    # fitz extracts clickable PDF hyperlinks as: "[URI]: https://github.com/handle"
+    # We must check BOTH formats to avoid false fraud flags
+    plain_text_match = gh_handle_lower in text_lower
+    uri_match = any(pattern in text_lower for pattern in [
+        f"[uri]: https://github.com/{gh_handle_lower}",
+        f"[uri]: http://github.com/{gh_handle_lower}",
+        f"github.com/{gh_handle_lower}",
+    ])
+    
+    if not plain_text_match and not uri_match:
         identity_warning = "Identity Fraud Detected: This exact GitHub handle is not explicitly linked or mentioned anywhere within this candidate's resume."
     else:
         # FRAUD LAYER 2: Identity Theft (Did they just paste a famous developer's Handle in their resume?)
@@ -1471,7 +1630,9 @@ async def start_interview(
     }
 
 @app.post("/api/resume/score")
+@limiter.limit("5/minute")
 async def score_resume(
+    request: Request,
     resume: UploadFile = File(...),
     jobDescription: Optional[str] = Form(None)
 ):
@@ -1479,11 +1640,19 @@ async def score_resume(
     Performs high-fidelity ATS scoring using the backend's robust PDF engine.
     """
     try:
-        # 1. Parsing Proper: Unified Forensic Extraction
+        # 0. Production Guard: File Validation
         content = await resume.read()
+        validate_pdf_upload(content, resume.filename)
+        
+        # 1. Parsing Proper: Unified Forensic Extraction
         extracted_text = await extract_text_from_pdf(content)
         
-        print(f"DEBUG: Extraction Complete. Captured {len(extracted_text)} characters via Unified Parser.")
+        # 1.1 Compute Mathematically Grounded JD Similarity
+        jd_analysis = {"score": 0, "top_missing_keywords": []}
+        if jobDescription:
+            jd_analysis = compute_jd_cosine_similarity(extracted_text, jobDescription)
+        
+        print(f"DEBUG: Extraction Complete. JD Similarity: {jd_analysis['score']}%")
         
         # 2. Check if Resume (Strict Field Validation)
         if not extracted_text or len(extracted_text) < 100:
@@ -1705,7 +1874,9 @@ async def score_resume(
                 ],
                 "overall_verdict": f"EXECUTIVE SUMMARY: {user_name}, your profile shows a {h['ats_score']}% match. Focus on quantifying your technical impact (%, $) to break into the 90+ elite tier.",
                 "full_resume_text": extracted_text,
-                "segmented_resume": segmented
+                "segmented_resume": segmented,
+                "jd_match_accuracy": jd_analysis["score"],
+                "jd_keyword_gaps": jd_analysis["top_missing_keywords"]
             }
             print("\n[FORENSIC REPORT (HEURISTIC)]:")
             print(json.dumps({k:v for k,v in result.items() if k != 'full_resume_text'}, indent=2))
@@ -1714,6 +1885,8 @@ async def score_resume(
         try:
             if raw_json:
                 res = json.loads(raw_json)
+                res["jd_match_accuracy"] = jd_analysis["score"]
+                res["jd_keyword_gaps"] = jd_analysis["top_missing_keywords"]
                 print("\n[FORENSIC REPORT (AI-DEEP-DIVE)]:")
                 print(json.dumps({k:v for k,v in res.items() if k != 'full_resume_text'}, indent=2))
                 return res
