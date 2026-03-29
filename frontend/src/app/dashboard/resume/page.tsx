@@ -5,7 +5,7 @@ import {
   UploadCloud, FileText, Target, CheckCircle2, ChevronRight, 
   Download, RefreshCcw, LayoutPanelLeft, Lock, AlertCircle, 
   ChevronDown, ChevronUp, Copy, Check, Info, FileSearch, Sparkles,
-  ArrowRight, BookText, Crown, Zap, RotateCcw, ShieldCheck
+  ArrowRight, BookText, Crown, Zap, RotateCcw, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -435,7 +435,7 @@ const ForensicLoader = ({ active }: { active: boolean }) => {
           </div>
           <div className="space-y-2">
             <h2 className="text-3xl font-black font-outfit tracking-tight text-white flex items-center justify-center gap-3">
-               <ShieldCheck className="w-6 h-6 text-primary" /> Forensic Audit
+               <Shield className="w-6 h-6 text-primary" /> Forensic Audit
             </h2>
             <p className="text-xs text-white/40 font-bold uppercase tracking-[0.3em] font-sans">Deployment Status: Active</p>
           </div>

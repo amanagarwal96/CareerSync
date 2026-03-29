@@ -977,7 +977,6 @@ async def recruiter_verify(
     extracted_text = ""
     
     if resume_file:
-        content = await resume_file.read()
         extracted_text = await extract_text_from_pdf(content)
         if not extracted_text:
             return {
