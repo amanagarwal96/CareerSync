@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFParse } from 'pdf-parse';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import path from 'path';
 
 export async function POST(req: NextRequest) {
   try {

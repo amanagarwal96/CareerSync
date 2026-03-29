@@ -5,9 +5,17 @@ import Link from "next/link";
 import { Sparkles, LogOut, Menu, X } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 
+import { usePathname } from "next/navigation";
+
 export function Navbar() {
   const { data: session } = useSession();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Hide global navbar on dashboard pages as they have their own navigation
+  if (pathname?.startsWith("/dashboard")) {
+    return null;
+  }
 
   return (
     <nav className="fixed top-0 w-full z-50 glass-panel border-b border-white/10 px-6 py-4 transition-all duration-300">

@@ -15,6 +15,7 @@ services:
       - ./frontend/.env
     environment:
       - NODE_ENV=development
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:8000
     depends_on:
       - backend
 
@@ -29,8 +30,6 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/careersync
       - REDIS_URL=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
       - ./backend/.env
     depends_on:
