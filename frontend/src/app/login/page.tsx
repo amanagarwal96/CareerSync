@@ -18,9 +18,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     }
-  }, [status, router])
+  }, [status])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,8 +38,8 @@ export default function LoginPage() {
         throw new Error(res.error)
       }
 
-      router.push("/dashboard")
-      router.refresh()
+      // Force a full browser refresh to ensure all global layouts and session states are perfectly synced
+      window.location.href = "/dashboard"
     } catch (err: any) {
       setError("Invalid credentials")
     } finally {

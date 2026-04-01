@@ -48,17 +48,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-outfit">
-      {/* Mobile Header Toggle */}
-      <div className="md:hidden fixed top-0 left-0 w-full h-16 glass-panel border-b border-white/10 z-[60] flex items-center justify-between px-6">
-        <h2 className="text-lg font-bold text-white">CareerSync</h2>
-        <button 
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-primary transition-all border border-white/10"
-        >
-          {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
-
+      {/* Global Navbar handles top-level branding and mobile menu */}
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -69,7 +59,7 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <aside className={`
-        fixed md:relative inset-y-0 left-0 z-[55] w-72 glass-panel border-r border-white/10 flex flex-col pt-20 md:pt-20 
+        fixed md:relative inset-y-0 left-0 z-[40] w-72 glass-panel border-r border-white/10 flex flex-col pt-24 md:pt-20 
         transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
@@ -123,7 +113,14 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pt-24 md:pt-20 px-4 md:px-8 pb-12 relative w-full">
+      <main className="flex-1 overflow-y-auto pt-28 md:pt-24 px-4 md:px-8 pb-12 relative w-full">
+        {/* Floating Mobile Sidebar Trigger */}
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="md:hidden fixed bottom-6 right-6 w-12 h-12 rounded-full bg-primary text-white shadow-lg z-[45] flex items-center justify-center animate-bounce-subtle"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
         <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[150px] pointer-events-none" />
         {children}
       </main>
