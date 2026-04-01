@@ -63,12 +63,13 @@ def validate_resume_structure(text: str) -> Dict[str, any]:
         "experience": ["experience", "work history", "employment", "professional background", "internship", "placements"],
         "skills": ["skills", "technologies", "tech stack", "competencies", "tools", "expertise"],
         "projects": ["projects", "personal projects", "portfolio", "github", "open source"],
-        "certifications": ["certifications", "licenses", "courses", "achievements", "awards"]
+        "certifications": ["certifications", "licenses", "courses", "achievements", "awards"],
+        "summary": ["summary", "profile", "objective", "about me", "professional summary"]
     }
     
     # Red-flag keywords typically found in Job Descriptions but NOT in Resumes
     jd_red_flags = [
-        "who we are", "about us", "the role", "job description", "responsibilities", 
+        "who we are", "about us", "the role", "job description", 
         "what we offer", "equal opportunity", "we are looking for", "join our team",
         "working at", "successful candidate", "apply now", "benefits:", "perks:"
     ]
@@ -101,11 +102,11 @@ def validate_resume_structure(text: str) -> Dict[str, any]:
     if not has_social:
         missing_sections.append("linkedin/portfolio")
             
-    # Strict Validation Logic
-    # 1. Must NOT be an obvious JD
-    # 2. Must have at least 3 professional sections
+    # Relaxed Validation Logic for Students/Juniors
+    # 1. Must NOT be an obvious JD (High threshold)
+    # 2. Must have at least 2 professional sections (Down from 3)
     # 3. Must have contact info
-    is_valid = not is_jd and len(found_sections) >= 3 and has_contact
+    is_valid = not is_jd and len(found_sections) >= 2 and has_contact
     
     message = "Structural Integrity Verified."
     if is_jd:
