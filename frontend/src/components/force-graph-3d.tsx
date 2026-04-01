@@ -20,6 +20,18 @@ const ForceGraph3DComponent: React.FC<Props> = ({ data, onNodeClick }) => {
 
   useEffect(() => {
     setMounted(true);
+
+    // Suppress library-level THREE.Clock deprecation warnings to maintain clean production logs
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('THREE.Clock: This module has been deprecated')) {
+        return;
+      }
+      originalWarn(...args);
+    };
+    return () => {
+      console.warn = originalWarn;
+    };
   }, []);
 
   const handleNodeClick = useCallback((node: any) => {

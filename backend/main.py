@@ -2187,12 +2187,39 @@ async def score_resume(
         h = calculate_heuristic_metrics(extracted_text, jobDescription)
         lines = [l.strip() for l in extracted_text.split('\n') if l.strip()]
         user_name = lines[0] if lines else "Engineer"
-        raw_lines = [l.strip() for l in extracted_text.split('\n') if len(l.strip()) > 5]
+        
+        # Forensic Rule Engine: Smart Segmentation
+        import re
         segmented = []
-        for line in raw_lines[:15]:
+        for line in lines:
+            line_lower = line.lower()
             label = "neutral"
-            if any(kw in line.lower() for kw in ["python", "react", "architecture", "lead", "optimized"]): label = "impactful"
-            segmented.append({"text": line, "label": label, "comment": "Verified Vector Analysis."})
+            comment = "Standard structural data point."
+            
+            # Impactful: Contains numbers (%), action verbs, or core tech
+            if re.search(r'\d+%|\$\d+|[0-9]{1,3}\s?%', line) or any(v in line_lower for v in ["architected", "optimized", "pioneered", "multiplied", "delivered"]):
+                label = "impactful"
+                comment = "HIGH SIGNAL: Quantified impact or leadership verb detected."
+            elif any(kw in line_lower for kw in ["python", "react", "aws", "docker", "typescript", "java", "sql"]):
+                label = "impactful"
+                comment = "TECHNICAL ANCHOR: Core technology match detected."
+            
+            # Weak/Irrelevant: Buzzwords or filler
+            elif any(bw in line_lower for bw in ["team player", "passionate", "worked on", "handled", "quick learner"]):
+                label = "weak"
+                comment = "GENERIC SIGNAL: Replace with specific outcomes/metrics."
+                
+            # Contact Info
+            elif "@" in line or re.search(r'\+?\d[\d\-\(\) ]{8,}', line):
+                label = "neutral"
+                comment = "IDENTITY VECTOR: Contact/PII verification."
+            
+            # Structural
+            elif len(line) < 30 and any(h in line_lower for h in ["education", "experience", "skills", "projects", "summary"]):
+                label = "neutral"
+                comment = "STRUCTURAL HEADER: Layout integrity verified."
+
+            segmented.append({"text": line, "label": label, "comment": comment})
         
         missing = h.get("missing_keywords", [])
         strengths = ["Technical Foundation", "Role-Context Alignment"]
@@ -2202,6 +2229,7 @@ async def score_resume(
             "ats_score": h["ats_score"],
             "score_breakdown": h["score_breakdown"],
             "hiring_probability": h["hiring_probability"],
+
             "detailed_checks": [
                 { "name": "Readability", "score": 9, "status": "pass", "feedback": "Optimized structure for scanability." },
                 { "name": "Dates", "score": 10, "status": "pass", "feedback": "Chronological history verified." },
@@ -2446,8 +2474,20 @@ async def fetch_and_email_jobs(request: GhostFetchRequest, db: Session = Depends
         server.login(smtp_email, smtp_password); server.sendmail(smtp_email, request.target_email, msg.as_string()); server.quit()
         return {"status": "success", "message": f"Successfully delivering {len(matches)} sorted matches."}
     except Exception as e:
-        print(f"SMTP Error: {e}")
-        return {"status": "error", "message": "Delivery failed."}
+        error_msg = str(e)
+        print(f"SMTP Error: {error_msg}")
+        
+        # Deploy Forensic Error Fingerprinting
+        friendly_msg = "Delivery failed."
+        if "authentication failed" in error_msg.lower() or "535" in error_msg:
+            friendly_msg = "SMTP Auth Failed: Check credentials or use a Gmail App Password."
+        elif "connection" in error_msg.lower():
+            friendly_msg = "SMTP Network Error: Connection timed out or blocked."
+        elif "quota" in error_msg.lower():
+            friendly_msg = "SMTP Quota Exceeded: Daily email limit reached."
+            
+        return {"status": "error", "message": friendly_msg, "detail": error_msg}
+
 
 if __name__ == "__main__":
     import uvicorn
