@@ -1617,7 +1617,11 @@ async def get_ai_completion(messages: list, response_format: str = "text"):
                 "temperature": 0.2
             }
             if response_format == "json_object":
-                gen_config["response_mime_type"] = "application/json"
+                if "gemini" in gemini_model_id.lower():
+                    gen_config["response_mime_type"] = "application/json"
+                else:
+                    # Non-Gemini models (Gemma, etc.) often don't support JSON mode via SDK config
+                    prompt += "\n\nIMPORTANT: Respond strictly in valid JSON format only."
             
             response = gemini_client.models.generate_content(
                 model=gemini_model_id,
