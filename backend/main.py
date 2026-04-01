@@ -1937,15 +1937,32 @@ async def score_resume(
         content = await resume.read()
         validate_pdf_upload(content, resume.filename)
         
-        # 1. Parsing Proper: Unified Forensic Extraction
-        extracted_text = await extract_text_from_pdf(content)
+        # 1.2 Preparation for Forensic Audit (Identity and Segmentation)
+        lines = [l.strip() for l in extracted_text.split('\n') if l.strip()]
+        user_name = lines[0] if lines else "Candidate"
         
-        # 1.1 Compute Mathematically Grounded JD Similarity
-        jd_analysis = {"score": 0, "top_missing_keywords": []}
-        if jobDescription:
-            jd_analysis = compute_jd_cosine_similarity(extracted_text, jobDescription)
+        # Sentence-Level Forensic Analyzer (Initial Structural Analysis)
+        raw_lines = [l.strip() for l in extracted_text.split('\n') if len(l.strip()) > 5]
+        segmented = []
+        irrelevant_pattern = r'(\d{6}|india|noida|address|marital|nationality|dob|date of birth|hobbies|references|phone:|email:)'
+        metric_pattern = r'(\d+%|\$\d+|increased|reduced|optimized|improved|saved)'
+        action_verbs = ["architected", "pioneered", "implemented", "led", "developed", "managed", "built"]
         
-        print(f"DEBUG: Extraction Complete. JD Similarity: {jd_analysis['score']}%")
+        for line in raw_lines:
+            label = "neutral"
+            comment = "Standard professional vector."
+            if re.search(irrelevant_pattern, line.lower()):
+                label = "irrelevant"
+                comment = "Forensic Alert: Personal data/Generic fluff reduces scan speed. Move to footer or remove."
+            elif re.search(metric_pattern, line.lower()) or any(v in line.lower() for v in action_verbs):
+                label = "impactful"
+                comment = "High-velocity signal: Quantified achievement detected."
+            elif len(line) < 40 or "worked on" in line.lower() or "assisted" in line.lower():
+                label = "weak"
+                comment = "Passive signal: Bullet lacks hard metrics or architectural ownership."
+            segmented.append({ "text": line, "label": label, "comment": comment })
+
+        print(f"DEBUG: Extraction Complete. Identity: {user_name}. JD Similarity: {jd_analysis['score']}%")
         
         # 2. Check if Resume (Strict Field Validation)
         if not extracted_text or len(extracted_text) < 100:
@@ -2060,7 +2077,7 @@ async def score_resume(
 
             # 2. Heuristic Intelligence Engine (Safe Zone)
             print("🚀 DEPLOYING HEURISTIC INTELLIGENCE ENGINE V26...")
-            h = calculate_heuristic_metrics(extracted_text, jd_text)
+            h = calculate_heuristic_metrics(extracted_text, jobDescription)
             
             # Enrich heuristic result with segmented context for UX consistency
             h["full_resume_text"] = extracted_text
