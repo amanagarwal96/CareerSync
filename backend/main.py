@@ -86,7 +86,8 @@ def validate_resume_structure(text: str) -> Dict[str, any]:
             
     # Calculate JD Score (Penalty)
     jd_score = sum(1 for flag in jd_red_flags if flag in text_lower)
-    is_jd = jd_score >= 3 # Too many JD-specific phrases
+    # High threshold for students who might list "Responsibilities" or "The Role" in headers
+    is_jd = jd_score >= 5 
             
     # Enhanced Contact Intelligence
     email_pattern = r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
@@ -106,7 +107,8 @@ def validate_resume_structure(text: str) -> Dict[str, any]:
     # 1. Must NOT be an obvious JD (High threshold)
     # 2. Must have at least 2 professional sections (Down from 3)
     # 3. Must have contact info
-    is_valid = not is_jd and len(found_sections) >= 2 and has_contact
+    # Even if JD-like words exist, if 3+ resume sections are found, we trust it's a resume
+    is_valid = (not is_jd or len(found_sections) >= 3) and len(found_sections) >= 2 and has_contact
     
     message = "Structural Integrity Verified."
     if is_jd:
@@ -1993,14 +1995,18 @@ async def score_resume(
         print(json.dumps(resume_json, indent=2))
         print("="*50 + "\n")
         
-        if not resume_json.get("is_professional_resume", False) or not validation["is_valid"]:
-            is_jd = not resume_json.get("is_professional_resume", True) or "Job Description" in validation["message"]
-            detail_msg = "Document Validation Failed: This appears to be a Job Description or non-resume PDF. Please upload your professional CV."
-            if not validation["is_valid"] and not is_jd:
-                detail_msg = f"Forensic Guardrail: Document structure invalid. {validation['message']}"
-            
-            print(f"CRITICAL: Document rejected. AI Professional: {resume_json.get('is_professional_resume')}, Heuristic Valid: {validation['is_valid']}")
-            raise HTTPException(status_code=400, detail=detail_msg)
+        # 2. Final Guardrail: Heuristic Validation Priority
+        # Even if AI (especially Gemma) incorrectly marks it as non-professional, 
+        # we trust the Heuristic Structural Check if it passed.
+        is_professional_ai = resume_json.get("is_professional_resume", False)
+        
+        if not is_professional_ai and not validation["is_valid"]:
+            print(f"CRITICAL: Document rejected. AI Professional: {is_professional_ai}, Heuristic Valid: {validation['is_valid']}")
+            raise HTTPException(status_code=400, detail=f"Document Validation Failed: This doesn't meet professional standards. {validation['message']}")
+        
+        if not is_professional_ai and validation["is_valid"]:
+            print("WARNING: AI incorrectly flagged resume as non-professional. Overriding with Heuristic Success.")
+            resume_json["is_professional_resume"] = True
 
         # 4. Check its ATS (Scoring Phase)
         # Forensic Recruitment System Prompt (ULTRON V20 Gold Standard)
