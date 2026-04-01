@@ -15,26 +15,36 @@ services:
       - ./frontend/.env
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_BACKEND_URL=http://backend:8000
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+      - BACKEND_URL_INTERNAL=http://careersync-backend:8000
+      - DATABASE_URL=postgresql://postgres:careersync_prod_safe@db:5432/careersync
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_URL_INTERNAL=http://frontend:3000
     depends_on:
       - backend
+    networks:
+      - careersync_net
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: careersync-backend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql://postgres:REPLACE_WITH_SECURE_PASSWORD@db:5432/careersync
+      - DATABASE_URL=postgresql://postgres:careersync_prod_safe@db:5432/careersync
       - REDIS_URL=redis://redis:6379/0
     env_file:
       - ./backend/.env
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
       - redis
+    networks:
+      - careersync_net
 
   db:
     image: postgres:15-alpine
@@ -42,15 +52,23 @@ services:
       - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=REPLACE_WITH_SECURE_PASSWORD
+      - POSTGRES_PASSWORD=careersync_prod_safe
       - POSTGRES_DB=careersync
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - careersync_net
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    networks:
+      - careersync_net
+
+networks:
+  careersync_net:
+    driver: bridge
 
 volumes:
   postgres_data:

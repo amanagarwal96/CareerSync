@@ -4,8 +4,15 @@ import { db } from "@/lib/db"
 import Link from "next/link"
 import { FileText, Target, ShieldCheck, CheckCircle2, ChevronRight, UploadCloud, Star } from "lucide-react"
 
+import { redirect } from "next/navigation"
+
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
+  
+  if (!session) {
+    redirect("/login")
+  }
+
   const user = session?.user as any;
   const userName = user?.name || "Aman kumar"
 

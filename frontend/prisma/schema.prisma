@@ -54,6 +54,31 @@ model User {
   role             String  @default("STUDENT")
   aiMode           String  @default("pro")
   discovery        Boolean @default(true)
+  isGhostMode      Boolean @default(false)
+  lastGhostScan    DateTime?
+  
+  linkedinUrl      String?
+  naukriUrl        String?
+  indeedUrl        String?
+  internshalaUrl   String?
+  targetJobRole    String?
+  
+  jobMatches       JobMatch[]
+  interviews       InterviewSession[]
+}
+
+model JobMatch {
+  id          String   @id @default(cuid())
+  userId      String
+  role        String
+  company     String
+  score       Int
+  summary     String?
+  sourceUrl   String?
+  status      String   @default("UNREAD")
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -73,6 +98,7 @@ model Resume {
   fileName    String?
   jdSimilarity Float?
   jdGaps      String?
+  graphData   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -104,4 +130,32 @@ model Candidate {
   createdAt   DateTime @default(now())
 
   recruiter   User     @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+}
+
+model InterviewSession {
+  id              String   @id @default(cuid())
+  userId          String
+  targetRole      String
+  companyName     String?
+  jdText          String?
+  resumeText      String?
+  overallVerdict  String?
+  overallJustification String?
+  status          String   @default("IN_PROGRESS")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        InterviewMessage[]
+}
+
+model InterviewMessage {
+  id              String   @id @default(cuid())
+  sessionId       String
+  role            String   // 'assistant' or 'user'
+  content         String
+  analysis        String?  // JSON string of live analysis metrics
+  createdAt       DateTime @default(now())
+  
+  session         InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
