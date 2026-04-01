@@ -425,14 +425,19 @@ else:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
-    # Strip 'pgbouncer=true' while robustly preserving other query parameters
-    if "pgbouncer=true" in DATABASE_URL:
-        # Case 1: pgbouncer is the first of multiple parameters (?pgbouncer=true&...)
-        DATABASE_URL = DATABASE_URL.replace("?pgbouncer=true&", "?")
-        # Case 2: pgbouncer is at the end or preceded by other params (&pgbouncer=true)
-        DATABASE_URL = DATABASE_URL.replace("&pgbouncer=true", "")
-        # Case 3: pgbouncer is the only parameter (?pgbouncer=true)
-        DATABASE_URL = DATABASE_URL.replace("?pgbouncer=true", "")
+    # Strip parameters that Supabase Poolers use but Psycopg2 doesn't recognize
+    for param_to_remove in ["pgbouncer=true", "connection_limit=1"]:
+        # Case 1: param is the first of multiple parameters (?param&...)
+        DATABASE_URL = DATABASE_URL.replace(f"?{param_to_remove}&", "?")
+        # Case 2: param is preceded by other params (&param)
+        DATABASE_URL = DATABASE_URL.replace(f"&{param_to_remove}", "")
+        # Case 3: param is the only parameter (?param)
+        DATABASE_URL = DATABASE_URL.replace(f"?{param_to_remove}", "")
+
+    # Final cleanup: Remove any trailing question marks if all params were stripped
+    if DATABASE_URL.endswith("?"):
+        DATABASE_URL = DATABASE_URL[:-1]
+
         print("INFO: High-fidelity DSN sanitization complete (pgbouncer stripped).")
 
 engine = create_engine(DATABASE_URL)
