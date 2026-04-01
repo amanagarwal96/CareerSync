@@ -684,7 +684,9 @@ if os.getenv("GEMINI_API_KEY"):
         test_models = [
             'gemini-1.5-flash', 
             'gemini-1.5-pro',
-            'gemini-2.0-flash'
+            'gemini-2.0-flash',
+            'models/gemini-1.5-flash',
+            'models/gemini-1.5-pro'
         ]
 
         import time
@@ -2135,14 +2137,14 @@ async def score_resume(
 
             result = {
                 "ats_score": h["ats_score"],
-                "score_breakdown": h["breakdown"],
+                "score_breakdown": h["score_breakdown"],
                 "hiring_probability": h["hiring_probability"],
                 "detailed_checks": [ 
-                    { "name": "Readability", "score": h["breakdown"]["formatting"], "status": "pass" if h["breakdown"]["formatting"] > 7 else "warning", "feedback": f"Structural density ({len(lines)} vectors) is standard. Avoid excessive white space." },
+                    { "name": "Readability", "score": h["score_breakdown"]["formatting"], "status": "pass" if h["score_breakdown"]["formatting"] > 7 else "warning", "feedback": f"Structural density ({len(lines)} vectors) is standard. Avoid excessive white space." },
                     { "name": "Dates", "score": 9, "status": "pass", "feedback": "Chronological date formatting is consistent across all documented entries." },
-                    { "name": "Growth signals", "score": int(h["breakdown"]["quantified_achievements"] / 4), "status": "pass" if h["metrics_found"] > 5 else "fail", "feedback": f"Forensic Alert: Found only {h['metrics_found']} impact metrics. Elite resumes require 10+." },
-                    { "name": "Job fit", "score": int(h["breakdown"]["keyword_match"] / 2.5), "status": "pass" if h["breakdown"]["keyword_match"] > 15 else "warning", "feedback": f"Technical alignment score is based on: {skill_string}." },
-                    { "name": "Weak verbs", "score": h["breakdown"]["action_verbs"], "status": "pass" if h["breakdown"]["action_verbs"] > 6 else "fail", "feedback": f"Action signal detection: {', '.join(h['verbs'])}." },
+                    { "name": "Growth signals", "score": int(h["score_breakdown"]["quantified_achievements"] / 4), "status": "pass" if h["metrics_found"] > 5 else "fail", "feedback": f"Forensic Alert: Found only {h['metrics_found']} impact metrics. Elite resumes require 10+." },
+                    { "name": "Job fit", "score": int(h["score_breakdown"]["keyword_match"] / 2.5), "status": "pass" if h["score_breakdown"]["keyword_match"] > 15 else "warning", "feedback": f"Technical alignment score is based on: {skill_string}." },
+                    { "name": "Weak verbs", "score": h["score_breakdown"]["action_verbs"], "status": "pass" if h["score_breakdown"]["action_verbs"] > 6 else "fail", "feedback": f"Action signal detection: {', '.join(h['verbs'])}." },
                     { "name": "Buzzwords", "score": 10 - int(h["buzzword_penalty"]/2), "status": "pass" if h["buzzword_penalty"] < 4 else "warning", "feedback": f"Found {int(h['buzzword_penalty']/2)} generic buzzwords/fluff phrases." },
                     { "name": "Contact Info", "score": 10, "status": "pass", "feedback": f"Identity and contact vectors verified for candidate." },
                     { "name": "Repetition", "score": 10 - int(h["buzzword_penalty"]/3), "status": "warning", "feedback": "Rotate your vocabulary to avoid 'verb fatigue' in project bullets." }
