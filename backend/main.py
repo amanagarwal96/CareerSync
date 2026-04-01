@@ -2470,9 +2470,10 @@ async def fetch_and_email_jobs(request: GhostFetchRequest, db: Session = Depends
     msg["From"] = f"Ghost Agent <{smtp_email}>"; msg["To"] = request.target_email
     msg.attach(MIMEText(html_content, "html"))
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587); server.starttls()
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         server.login(smtp_email, smtp_password); server.sendmail(smtp_email, request.target_email, msg.as_string()); server.quit()
         return {"status": "success", "message": f"Successfully delivering {len(matches)} sorted matches."}
+
     except Exception as e:
         error_msg = str(e)
         print(f"SMTP Error: {error_msg}")
