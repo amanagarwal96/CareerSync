@@ -1937,6 +1937,14 @@ async def score_resume(
         content = await resume.read()
         validate_pdf_upload(content, resume.filename)
         
+        # 1. Parsing Proper: Unified Forensic Extraction
+        extracted_text = await extract_text_from_pdf(content)
+        
+        # 1.1 Compute Mathematically Grounded JD Similarity
+        jd_analysis = {"score": 0, "top_missing_keywords": []}
+        if jobDescription:
+            jd_analysis = compute_jd_cosine_similarity(extracted_text, jobDescription)
+
         # 1.2 Preparation for Forensic Audit (Identity and Segmentation)
         lines = [l.strip() for l in extracted_text.split('\n') if l.strip()]
         user_name = lines[0] if lines else "Candidate"
