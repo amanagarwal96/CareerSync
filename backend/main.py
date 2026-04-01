@@ -356,7 +356,7 @@ def calculate_heuristic_metrics(text: str, jd: Optional[str] = None):
     return {
         "ats_score": total_ats,
         "hiring_probability": hiring_prob,
-        "breakdown": {
+        "score_breakdown": {
             "keyword_match": keyword_score,
             "formatting": formatting_score,
             "quantified_achievements": impact_score,
@@ -367,7 +367,12 @@ def calculate_heuristic_metrics(text: str, jd: Optional[str] = None):
         "skills": found_keywords[:6],
         "verbs": found_verbs_unique[:4],
         "buzzword_penalty": buzzword_penalty,
-        "graph": {"nodes": nodes, "links": links}
+        "graph": {"nodes": nodes, "links": links},
+        "missing_keywords": [k for k in tech_keywords if k not in found_keywords and k in (jd or "").lower()],
+        "improvements": [
+            "Add more quantified metrics" if impact_score < 25 else "Refine technical layout",
+            "Increase keyword density" if keyword_score < 15 else "Optimize action verbs"
+        ]
     }
 
 def extract_contact_info(text: str):
@@ -2196,7 +2201,7 @@ async def score_resume(
         result = {
             "ats_score": h["ats_score"],
             "score_breakdown": h["score_breakdown"],
-            "hiring_probability": h["ats_score"] - 10,
+            "hiring_probability": h["hiring_probability"],
             "detailed_checks": [
                 { "name": "Readability", "score": 9, "status": "pass", "feedback": "Optimized structure for scanability." },
                 { "name": "Dates", "score": 10, "status": "pass", "feedback": "Chronological history verified." },
@@ -2222,8 +2227,9 @@ async def score_resume(
             "segmented_resume": segmented,
             "jd_match_accuracy": jd_analysis["score"],
             "jd_keyword_gaps": jd_analysis["top_missing_keywords"],
-            "graph": {"nodes": [], "links": []}
+            "graph": h.get("graph", {"nodes": [], "links": []})
         }
+
         return result
 
     except HTTPException as he:
