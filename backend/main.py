@@ -419,9 +419,17 @@ if not DATABASE_URL:
     print("For Production (Railway): Add it in the 'Variables' tab.")
     print("For Local: Add it to your backend/.env file.")
     print("!"*60 + "\n")
-    # Fallback to an empty string or memory store to prevent immediate crash, 
-    # letting us see the logs before the app eventually fails on a DB op.
     DATABASE_URL = "sqlite:///:memory:"
+else:
+    # Production Hardening: SQLAlchemy/Psycopg2 requires 'postgresql://' not 'postgres://'
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Strip 'pgbouncer=true' as it's a Prisma-specific flag and triggers errors in Psycopg2
+    if "pgbouncer=true" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("?pgbouncer=true", "")
+        DATABASE_URL = DATABASE_URL.replace("&pgbouncer=true", "")
+        print("INFO: Stripped 'pgbouncer' flag for SQLAlchemy compatibility.")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

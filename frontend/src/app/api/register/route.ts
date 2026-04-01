@@ -69,10 +69,18 @@ export async function POST(req: Request) {
       { user: { id: newUser.id, email: newUser.email, name: newUser.name }, message: "User created successfully" },
       { status: 201 }
     )
-  } catch (error) {
-    console.error("REGISTER API ERROR:", error);
+  } catch (error: any) {
+    console.error("❌ REGISTER API ERROR (Forensic):", {
+      code: error?.code,
+      message: error?.message,
+      meta: error?.meta,
+      stack: error?.stack
+    });
     return NextResponse.json(
-      { message: "Something went wrong" },
+      { 
+        message: "Something went wrong", 
+        dev_note: error?.message // Temporary: helps identify missing columns in logs
+      },
       { status: 500 }
     )
   }
