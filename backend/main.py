@@ -190,12 +190,20 @@ async def extract_jd_from_url(url: str) -> str:
             return ""
 
 def clean_json_string(raw: str) -> str:
-    """Extracts JSON from Markdown-formatted AI responses."""
+    """Extracts JSON from Markdown or raw text with a robust hunt-and-extract regex."""
     if not raw: return ""
-    # Strip Markdown Code Blocks
+    # 1. Primary: Strip Markdown Code Blocks
     clean = re.sub(r"```(?:json)?\s*(.*?)\s*```", r"\1", raw, flags=re.DOTALL)
-    # Remove any leading/trailing garbage
     clean = clean.strip()
+    
+    # 2. Secondary: If still not valid JSON, hunt for the first { and last }
+    if not (clean.startswith('{') and clean.endswith('}')):
+        try:
+            match = re.search(r'(\{.*\})', clean, re.DOTALL)
+            if match:
+                clean = match.group(1)
+        except:
+            pass
     return clean
 
 async def extract_resume_json(text: str) -> Dict[str, any]:
@@ -286,6 +294,7 @@ def calculate_heuristic_metrics(text: str, jd: Optional[str] = None):
     from collections import Counter
     text_lower = text.lower()
     lines = [l.strip() for l in text.split('\n') if l.strip()]
+    improvements = []
     
     # 1. Keyword Score (Requires High Density)
     tech_keywords = [
@@ -695,8 +704,9 @@ if os.getenv("GEMINI_API_KEY"):
         # Robust Model Discovery for 2024-2025 High-Performance Models
         test_models = [
             'gemini-1.5-flash', 
+            'gemini-1.5-flash-8b', # Extremely fast/cheap/reliable
             'gemini-1.5-pro',
-            'gemini-2.0-flash',
+            'gemini-2.0-flash', # Newest Gold Standard
             'models/gemini-1.5-flash',
             'models/gemini-1.5-pro'
         ]
@@ -713,7 +723,6 @@ if os.getenv("GEMINI_API_KEY"):
             except Exception as e:
                 # Silence 429 RESOURCE_EXHAUSTED specifically
                 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    # No print, just wait and proceed
                     time.sleep(1.5)
                 else:
                     print(f"DEBUG: Static model {m_id} discovery failed: {e}")
@@ -721,13 +730,15 @@ if os.getenv("GEMINI_API_KEY"):
         
         # FINAL FALLBACK: Dynamic Account Listing
         if not active_model:
-            # Only log once
             print("INFO: Static discovery failed. Attempting dynamic model listing...")
             try:
                 for model in client.models.list():
                     m_name = str(model.name).split('/')[-1] if '/' in str(model.name) else str(model.name)
+                    # BLACKLIST: Gemma-1b is too small for forensic ATS audits
+                    if "gemma" in m_name.lower() and "1b" in m_name.lower():
+                        continue
                     try:
-                        time.sleep(1.0)
+                        time.sleep(0.5)
                         _ = client.models.generate_content(model=m_name, contents="ping", config={"max_output_tokens": 1})
                         active_model = m_name
                         print(f"INFO: Dynamically discovered compatible model: {m_name}")
@@ -742,9 +753,9 @@ if os.getenv("GEMINI_API_KEY"):
             gemini_model_id = active_model
             print(f"INFO: Gemini engine [{active_model}] active and verified.")
         else:
-            print("WARNING: Gemini active but no compatible models found after list(). Fallback to Heuristic Engine.")
+            print("WARNING: Gemini active but no capable models found. Fallback to Scorer Logic.")
     except Exception as e:
-        print(f"ERROR: Gemini GenAI SDK Initialization failed: {e}")
+        print(f"ERROR: Gemini SDK Initialization failed: {e}")
 
 # Add fallback mocks
 def get_mock_resume_analysis():
@@ -1935,6 +1946,12 @@ async def score_resume(
     """
     try:
         import re  # Forensic Scope Lock
+        # Initialize Scorer Variables (Scope Safety for Fallbacks)
+        extracted_text = ""
+        user_name = "Candidate"
+        segmented = []
+        jd_analysis = {"score": 0, "top_missing_keywords": []}
+        
         # 0. Production Guard: File Validation
         content = await resume.read()
         validate_pdf_upload(content, resume.filename)
