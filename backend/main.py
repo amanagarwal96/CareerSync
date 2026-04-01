@@ -2071,7 +2071,7 @@ async def score_resume(
             
             # 2. Dynamic Strong Points (Signal Detection)
             strengths = []
-            if h["breakdown"]["formatting"] > 7: strengths.append("Clean architectural layout and structural density")
+            if h["score_breakdown"]["formatting"] > 7: strengths.append("Clean architectural layout and structural density")
             if h["metrics_found"] > 5: strengths.append(f"Strong quantification with {h['metrics_found']} verified impact vectors")
             if len(h["skills"]) > 5: strengths.append(f"Diverse tech stack alignment ({len(h['skills'])} high-value keywords)")
             if not strengths: strengths = ["Professional clear formatting", "Section-complete structural integrity"]
@@ -2087,7 +2087,7 @@ async def score_resume(
                     "example": "Optimized service latency by 35% across 10 regions using Redis partitioning."
                 })
             
-            if h["breakdown"]["action_verbs"] < 10:
+            if h["score_breakdown"]["action_verbs"] < 10:
                 improvements.append({
                     "category": "Action Signals",
                     "priority": "Medium",
@@ -2105,7 +2105,7 @@ async def score_resume(
                     "example": f"Applied {missing[0]} for orchestrating distributed systems across multi-cloud environments."
                 })
 
-            if h["breakdown"]["formatting"] < 8:
+            if h["score_breakdown"]["formatting"] < 8:
                 improvements.append({
                     "category": "Structure",
                     "priority": "Medium",
