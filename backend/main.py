@@ -412,6 +412,17 @@ limiter = Limiter(
 # DATABASE SETUP (SQLAlchemy)
 # ─────────────────────────────────────────────
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    print("\n" + "!"*60)
+    print("CRITICAL ERROR: 'DATABASE_URL' environment variable is NOT SET.")
+    print("For Production (Railway): Add it in the 'Variables' tab.")
+    print("For Local: Add it to your backend/.env file.")
+    print("!"*60 + "\n")
+    # Fallback to an empty string or memory store to prevent immediate crash, 
+    # letting us see the logs before the app eventually fails on a DB op.
+    DATABASE_URL = "sqlite:///:memory:"
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
