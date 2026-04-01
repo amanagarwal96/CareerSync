@@ -682,12 +682,12 @@ if os.getenv("GEMINI_API_KEY"):
         
         # Robust Model Discovery for 2024-2025 High-Performance Models
         test_models = [
-            'gemini-2.0-flash', 
-            'gemini-2.0-flash-lite', 
-            'gemini-1.5-flash-latest', 
             'gemini-1.5-flash', 
-            'gemini-1.5-pro'
+            'gemini-1.5-pro',
+            'gemini-2.0-flash', 
+            'gemini-2.0-flash-lite'
         ]
+
         import time
         active_model = None
         for m_id in test_models:
@@ -2469,10 +2469,34 @@ async def fetch_and_email_jobs(request: GhostFetchRequest, db: Session = Depends
     msg["Subject"] = f"Ghost Report: {len(matches)} Sorted Matches for {request.job_role}"
     msg["From"] = f"Ghost Agent <{smtp_email}>"; msg["To"] = request.target_email
     msg.attach(MIMEText(html_content, "html"))
+    # --- FINAL DISPATCH: GOOGLE APPS SCRIPT BRIDGE (Bypass SMTP Port Block) ---
+    GMAIL_BRIDGE_URL = os.getenv("GMAIL_BRIDGE_URL")
+    if GMAIL_BRIDGE_URL:
+        try:
+            print(f"DEBUG: Using Gmail Bridge for {request.target_email}...")
+            import httpx
+            payload = {
+                "to": request.target_email,
+                "subject": f"Ghost Report: {len(matches)} Sorted Matches for {request.job_role}",
+                "htmlBody": html_content
+            }
+            # Deploy HTTPS payload to the Google Relay Node
+            resp = httpx.post(GMAIL_BRIDGE_URL, json=payload, timeout=30.0, follow_redirects=True)
+            if resp.status_code == 200:
+                print(f"DEBUG: Bridge Mission Successful for {request.target_email}")
+                return {"status": "success", "message": f"Successfully delivering {len(matches)} sorted matches via Gmail Bridge."}
+            else:
+                print(f"DEBUG: Bridge Node Error: {resp.status_code}")
+                # Fall through to legacy SMTP
+        except Exception as bridge_err:
+            print(f"ERROR: Bridge Mission Failure: {bridge_err}")
+            # Fall through to legacy SMTP
+
+    # --- LEGACY SMTP FALLBACK ---
     try:
         server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         server.login(smtp_email, smtp_password); server.sendmail(smtp_email, request.target_email, msg.as_string()); server.quit()
-        return {"status": "success", "message": f"Successfully delivering {len(matches)} sorted matches."}
+        return {"status": "success", "message": f"Successfully delivering {len(matches)} sorted matches via SMTP."}
 
     except Exception as e:
         error_msg = str(e)
