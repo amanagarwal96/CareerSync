@@ -12,7 +12,8 @@ export async function saveResumeAnalysis(data: {
   fileName?: string,
   jdSimilarity?: number,
   jdGaps?: string,
-  graphData?: string
+  graphData?: string,
+  forensicAnalysis?: any
 }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return { success: false, error: "Not logged in" }
@@ -30,7 +31,8 @@ export async function saveResumeAnalysis(data: {
         fileName: data.fileName,
         jdSimilarity: data.jdSimilarity,
         jdGaps: data.jdGaps,
-        graphData: data.graphData
+        graphData: data.graphData,
+        forensicAnalysis: data.forensicAnalysis
       }
     })
     revalidatePath('/dashboard')

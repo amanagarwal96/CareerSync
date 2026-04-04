@@ -88,7 +88,7 @@ export const RewrittenBulletItem = ({ bullet }: { bullet: RewrittenBullet }) => 
       <div className="flex items-center gap-3 mb-5 p-3 bg-primary/5 border border-primary/15 rounded-xl">
         <Sparkles className="w-4 h-4 text-primary shrink-0" />
         <p className="text-[11px] text-white/60 leading-snug">
-          The engine found a <span className="text-rose-400 font-bold">weak bullet</span> in your resume and rewrote it using <span className="text-primary font-bold">FAANG-grade language</span>. Copy the improved version below.
+          The engine found a <span className="text-rose-400 font-bold">weak bullet</span> and restructures it using the <span className="text-primary font-bold">Action + Context + Scope</span> framework. Copy the improved version below.
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export const RewrittenBulletItem = ({ bullet }: { bullet: RewrittenBullet }) => 
             <p className="text-xs text-white/90 leading-relaxed font-semibold">{bullet.improved}</p>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-emerald-400/70 font-bold uppercase tracking-widest">
-            <CheckCircle2 className="w-3 h-3" /> STAR Method · Quantified · Action-Led
+            <CheckCircle2 className="w-3 h-3" /> Structurally Superior · Verifiable · Action-Led
           </div>
         </div>
       </div>
@@ -185,10 +185,10 @@ interface AnalysisCheck {
 
 export const DetailedAnalysis = ({ checks = [] }: { checks: AnalysisCheck[] }) => {
   const standardChecks = [
+    { name: "Actionable Impact", icon: "💎" },
+    { name: "Context Clues", icon: "🧠" },
+    { name: "Scope Verification", icon: "🛡️" },
     { name: "Readability", icon: "📖" },
-    { name: "Dates", icon: "🗓️" },
-    { name: "Growth signals", icon: "📈" },
-    { name: "Job fit", icon: "🎯" },
     { name: "Weak verbs", icon: "✍️" },
     { name: "Buzzwords", icon: "🐝" },
     { name: "Contact Info", icon: "👤" },

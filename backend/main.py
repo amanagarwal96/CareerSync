@@ -2041,30 +2041,30 @@ async def score_resume(
         # 3. Forensic Recruitment System Prompt (ULTRON V20 Gold Standard)
         system_prompt = """Act as a senior, ruthless FAANG Technical Recruiter and ATS Auditor with 20+ years of experience. Your goal is to provide a FORENSIC, industry-standard audit.
         
-        SCORING RULES (STRICT/RUTHLESS):
-        - 35% Weight to 'Quantified Achievements'. 
-        - If NO metrics (%, $, numbers) are found in project bullets, overall score MUST BE CAPPED at 62 max.
-        - Penalize Weak Verbs ('assisted', 'helped', 'worked on') - suggest 'Architected' or 'Pioneered' instead.
-        - Penalize generic formatting (lack of headers or inconsistent spacing).
+        SCORING RULES (ETHICAL/STRUCTURAL):
+        - 35% Weight to 'Structural Impact (Action + Context + Scope)'. 
+        - If bullet points are passive ("Handled X", "Responsible for Y") without describing the specific technical context or scope, cap the score at 62.
+        - FOCUS on clarifying the user's actual contributions. DO NOT invent metrics, percentages, or synthetic achievements.
+        - Penalize Weak Verbs ('assisted', 'helped', 'worked on') - suggest 'Architected', 'Pioneered', or 'Engineered' instead.
         
         STRICT RESPONSE FORMAT (JSON ONLY):
         {
           "ats_score": 0-100,
-          "score_breakdown": { "keyword_match": 0-25, "formatting": 0-10, "quantified_achievements": 0-40, "section_completeness": 0-15, "action_verbs": 0-10 },
+          "score_breakdown": { "keyword_match": 0-25, "formatting": 0-10, "structural_impact": 0-40, "section_completeness": 0-15, "action_verbs": 0-10 },
           "hiring_probability": 0-100,
           "detailed_checks": [ 
-            { "name": "Readability"|"Dates"|"Growth signals"|"Job fit"|"Weak verbs"|"Buzzwords"|"Contact Info"|"Repetition", "score": 0-10, "status": "pass"|"warning"|"fail", "feedback": "Forensic reasoning" }
+            { "name": "Actionable Impact"|"Context Clues"|"Scope Verification"|"Readability"|"Weak verbs"|"Buzzwords"|"Contact Info"|"Repetition", "score": 0-10, "status": "pass"|"warning"|"fail", "feedback": "Forensic reasoning" }
           ],
           "critical_issues": ["Specific, technical high-priority fixes"],
           "improvements": [
-            { "category": "...", "priority": "High"|"Medium", "issue": "...", "suggestion": "...", "example": "..." }
+            { "category": "...", "priority": "High"|"Medium", "issue": "...", "suggestion": "How to apply Action+Context+Scope", "example": "A structurally superior version of the user's original bullet" }
           ],
           "missing_keywords": [],
           "strong_points": [],
           "rewritten_bullets": [
-             { "original": "...", "improved": "Quantified, FAANG-level bullet" }
+             { "original": "...", "improved": "Structurally superior bullet following Action+Context+Scope. DO NOT INVENT METRICS." }
           ],
-          "overall_verdict": "Realistic summary (1-2 sentences)",
+          "overall_verdict": "Realistic summary focusing on structural alignment (1-2 sentences)",
           "full_resume_text": "...",
           "segmented_resume": [
              { "text": "...", "label": "impactful"|"weak"|"irrelevant"|"neutral", "comment": "..." }
@@ -2077,7 +2077,7 @@ async def score_resume(
         GRAPH RULES:
         - Nodes: list all major technical skills found. 'group' 1=Languages, 2=Frameworks/Lib, 3=Tools/Infra. 'val' is depth (1-10).
         - Links: connect skills that were used together in the same project or work experience. 'value' is strength of connection (1-5).
-        STRICT DATA INTEGRITY: You MUST provide scores for ALL 8 'detailed_checks' named EXACTLY as: Readability, Dates, Growth signals, Job fit, Weak verbs, Buzzwords, Contact Info, Repetition. Provide 'full_resume_text', 'segmented_resume', and a high-fidelity 'graph'.
+        STRICT DATA INTEGRITY: You MUST provide scores for ALL 8 'detailed_checks' named EXACTLY as: Actionable Impact, Context Clues, Scope Verification, Readability, Weak verbs, Buzzwords, Contact Info, Repetition. Provide 'full_resume_text', 'segmented_resume', and a high-fidelity 'graph'.
         """
         
         # Manual Quantification Analysis (Backend Guard)
